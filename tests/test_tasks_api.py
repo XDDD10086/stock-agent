@@ -151,6 +151,7 @@ def test_run_and_result_endpoints():
     assert len(run_payload["highlights"]) >= 2
     assert run_payload["valuecell_raw_response"]
     assert run_payload["prompt_chain_status"] == "direct_pass"
+    assert run_payload["llm_mode"] == "deterministic"
 
     result_response = client.get(f"/tasks/{created['task_id']}/result")
     assert result_response.status_code == 200
@@ -160,6 +161,7 @@ def test_run_and_result_endpoints():
     assert result_payload["risk_rating"] == "yellow"
     assert result_payload["valuecell_raw_response"]
     assert result_payload["prompt_chain_status"] == "direct_pass"
+    assert result_payload["llm_mode"] == "deterministic"
 
     artifacts_response = client.get(f"/tasks/{created['task_id']}/artifacts")
     assert artifacts_response.status_code == 200
@@ -175,7 +177,7 @@ def test_run_and_result_endpoints():
 
     plan_artifact = client.get(f"/tasks/{created['task_id']}/artifacts/plan_v1")
     assert plan_artifact.status_code == 200
-    assert plan_artifact.json()["payload"]["objective"].startswith("Research task:")
+    assert "结构化结论" in plan_artifact.json()["payload"]["objective"]
 
     diagnostics_artifact = client.get(f"/tasks/{created['task_id']}/artifacts/runner_diagnostics")
     assert diagnostics_artifact.status_code == 200
@@ -188,6 +190,7 @@ def test_run_and_result_endpoints():
     assert prompt_chain_artifact.status_code == 200
     assert prompt_chain_artifact.json()["payload"]["review_gate_status"] == "direct_pass"
     assert prompt_chain_artifact.json()["payload"]["final_prompt"] != "scan daily portfolio"
+    assert prompt_chain_artifact.json()["payload"]["llm_mode"] == "deterministic"
 
     orchestration_artifact = client.get(f"/tasks/{created['task_id']}/artifacts/orchestration_metrics")
     assert orchestration_artifact.status_code == 200

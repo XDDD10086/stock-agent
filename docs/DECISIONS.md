@@ -405,3 +405,25 @@
 
 - Schedule DB schema now includes `run_at_utc`, `time_of_day`, `days_of_week`.
 - App startup applies idempotent SQLite compat migrations for new columns.
+
+## D-019 Runtime LLM Mode Transparency and Completion Strictness
+
+- Date: 2026-04-18
+- Status: Accepted
+
+### Decision
+
+- Surface runtime LLM mode (`live` vs `deterministic`) in task outputs and prompt-chain artifacts.
+- Tighten ValueCell completion detection to avoid early capture of "intermediate reasoning/progress" text.
+- Rank multiple assistant candidates and prefer higher-quality completion-like response blocks.
+
+### Rationale
+
+- Operators must be able to confirm whether runs used real OpenAI/Gemini or deterministic fallback.
+- Early completion false positives caused incomplete raw responses and poor final parsing quality.
+
+### Consequences
+
+- `FinalResult` now includes `llm_mode`.
+- `wait_until_completed` requires richer final-response signals and additional stability polls.
+- Intermediate markers like `正在执行任务/思考过程/构建分析策略` are excluded from final capture.

@@ -49,13 +49,15 @@ def _call(label: str, fn):
 
 def _render_final_result(payload: dict) -> None:
     st.markdown("#### Structured Result")
-    c1, c2, c3 = st.columns(3)
+    c1, c2, c3, c4 = st.columns(4)
     with c1:
         st.metric("Status", payload.get("status", "unknown"))
     with c2:
         st.metric("Risk", payload.get("risk_rating", "unknown"))
     with c3:
         st.metric("Prompt Chain", payload.get("prompt_chain_status", "unknown"))
+    with c4:
+        st.metric("LLM Mode", payload.get("llm_mode", "unknown"))
 
     st.write(payload.get("summary", ""))
     highlights = payload.get("highlights", [])

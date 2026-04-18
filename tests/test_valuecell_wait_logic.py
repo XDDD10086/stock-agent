@@ -39,6 +39,7 @@ def test_wait_until_completed_requires_stable_meaningful_response(monkeypatch):
             "Generating response...",
             "Executive Summary: revenue stabilized and drawdown risk is moderate.",
             "Executive Summary: revenue stabilized and drawdown risk is moderate.",
+            "Executive Summary: revenue stabilized and drawdown risk is moderate.",
         ]
     )
     monkeypatch.setattr("app.providers.valuecell_runner.monotonic", FakeClock(step=0.2))
@@ -47,7 +48,7 @@ def test_wait_until_completed_requires_stable_meaningful_response(monkeypatch):
     adapter.wait_until_completed(timeout_seconds=5, poll_interval_seconds=1)
 
     assert page.selector_calls
-    assert page.timeout_calls == [1000, 1000]
+    assert page.timeout_calls == [1000, 1000, 1000]
 
 
 def test_wait_until_completed_times_out_on_loading_only_text(monkeypatch):

@@ -441,9 +441,23 @@
 - Added idempotent SQLite compat migration for legacy DBs:
   - auto-add schedule columns `run_at_utc`, `time_of_day`, `days_of_week`
 
+### Completed Work (Checkpoint 4 - LLM Mode + Completion Robustness)
+
+- Added runtime LLM mode visibility to outputs/artifacts:
+  - `FinalResult.llm_mode`
+  - `prompt_chain.llm_mode`
+- Upgraded deterministic fallback prompt generation to produce structured guidance prompt (non-pass-through).
+- Hardened ValueCell completion logic:
+  - ignores intermediate-progress text blocks
+  - requires richer completion signals plus extra stability polling
+  - ranks multiple assistant candidates and selects best-quality response
+- Local manual-test profile updated to `USE_LIVE_LLM=true` for real OpenAI/Gemini verification.
+
 ### Verification Evidence
 
 - Command: `.venv/bin/python -m pytest tests/test_valuecell_runner_contract.py tests/test_tasks_api.py tests/test_schedules_api.py -q`
 - Result: `16 passed`
+- Command: `.venv/bin/python -m pytest tests/test_valuecell_heuristics.py tests/test_valuecell_wait_logic.py tests/test_tasks_api.py tests/test_schedules_api.py tests/test_valuecell_runner_contract.py -q`
+- Result: `23 passed`
 - Command: `.venv/bin/python -m pytest -q`
-- Result: `35 passed`
+- Result: `37 passed`

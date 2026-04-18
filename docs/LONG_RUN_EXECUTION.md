@@ -50,6 +50,7 @@
 - M6 checkpoint 1 complete: review-gated prompt revision (`revised_once`) + prompt-chain artifact audit trail.
 - M6 checkpoint 2 complete: ValueCell raw assistant response roundtrip to API + frontend dual-panel rendering.
 - M6 checkpoint 3 complete: scheduler trigger matrix (`once/cron/daily/weekly`) + patch/run-once APIs + sqlite compat migration.
+- M6 checkpoint 4 complete: llm-mode visibility + stricter ValueCell completion heuristics to prevent premature capture.
 - Next focus: optional post-MVP refinements (async worker model, richer parser schema, CI matrix).
 
 ## Active Long Task Plan
@@ -62,6 +63,7 @@
 6. [x] Remove noisy third-party warning output in local test runs.
 7. [x] Add one-command startup/smoke scripts for MVP handoff.
 8. [x] Implement M6 pipeline hardening and scheduler expansion with full regression tests.
+9. [x] Fix post-acceptance issues: enforce visible LLM mode and block intermediate-response false positives.
 
 ## Definition of Progress
 

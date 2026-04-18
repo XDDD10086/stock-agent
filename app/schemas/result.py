@@ -14,5 +14,6 @@ class FinalResult(BaseModel):
     screenshots: list[str]
     valuecell_raw_response: str | None = None
     prompt_chain_status: str = "direct_pass"
+    llm_mode: str = "deterministic"
     failed_step: str | None = None
     error_message: str | None = None

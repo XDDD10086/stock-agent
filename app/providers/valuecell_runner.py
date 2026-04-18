@@ -50,6 +50,38 @@ _GENERATION_IN_PROGRESS_MARKERS = (
     "请稍等",
 )
 
+_INTERMEDIATE_PROGRESS_MARKERS = (
+    "正在执行任务",
+    "理解问题意图",
+    "构建分析策略",
+    "审视当前上下文",
+    "定位主要信息缺口",
+    "规划下一步分析路径",
+    "思考过程",
+    "thinking process",
+    "analyzing request",
+    "planning approach",
+)
+
+_COMPLETION_SIGNAL_MARKERS = (
+    "已完成任务",
+    "executive summary",
+    "执行摘要",
+    "risk rating",
+    "风险评级",
+    "风险等级",
+    "投资价值",
+    "综合分析报告",
+    "结论",
+    "建议",
+    "watchpoint",
+    "watchpoints",
+    "factor",
+    "signal",
+    "impact",
+    "confidence",
+)
+
 _TRIVIAL_RESPONSES = {
     "ok",
     "okay",
@@ -80,6 +112,8 @@ def has_meaningful_response(text: str) -> bool:
         return False
     if is_generation_in_progress(normalized):
         return False
+    if is_intermediate_progress(normalized):
+        return False
 
     # Heuristic: require enough semantic signal to avoid treating placeholder
     # tokens like "ok" or short loading echoes as final output.
@@ -88,6 +122,48 @@ def has_meaningful_response(text: str) -> bool:
 
     alnum_count = sum(1 for char in normalized if char.isalnum())
     return alnum_count >= 8
+
+
+def has_completion_signals(text: str) -> bool:
+    normalized = _normalize_text(text).lower()
+    if not normalized:
+        return False
+    return any(marker in normalized for marker in _COMPLETION_SIGNAL_MARKERS)
+
+
+def is_intermediate_progress(text: str) -> bool:
+    normalized = _normalize_text(text).lower()
+    if not normalized:
+        return False
+    return any(marker in normalized for marker in _INTERMEDIATE_PROGRESS_MARKERS)
+
+
+def is_final_response_candidate(text: str) -> bool:
+    normalized = _normalize_text(text)
+    if not has_meaningful_response(normalized):
+        return False
+    if is_intermediate_progress(normalized):
+        return False
+    if has_completion_signals(normalized):
+        return True
+    return len(normalized) >= 180
+
+
+def response_quality_score(text: str) -> int:
+    normalized = _normalize_text(text)
+    if not normalized:
+        return -10_000
+
+    score = len(normalized)
+    if has_completion_signals(normalized):
+        score += 400
+    if is_generation_in_progress(normalized):
+        score -= 600
+    if is_intermediate_progress(normalized):
+        score -= 800
+    if not has_meaningful_response(normalized):
+        score -= 400
+    return score
 
 
 class BrowserAdapter(Protocol):
@@ -346,19 +422,19 @@ class PlaywrightCdpAdapter:
                 page.wait_for_timeout(poll_ms)
                 continue
 
-            # ValueCell completion marker in current UI.
-            if "已完成任务" in candidate and len(candidate) >= 30:
-                return
-
-            if has_meaningful_response(candidate) and not is_generation_in_progress(candidate):
-                if candidate == last_candidate:
-                    stable_polls += 1
-                else:
-                    stable_polls = 0
-                if stable_polls >= 1:
-                    return
+            if candidate == last_candidate:
+                stable_polls += 1
             else:
                 stable_polls = 0
+
+            # Require richer completion than intermediate progress hints.
+            if is_final_response_candidate(candidate):
+                # ValueCell marker path can return slightly earlier once content stabilizes.
+                if "已完成任务" in candidate and stable_polls >= 1:
+                    return
+                # Generic final-response path: require one extra stable poll.
+                if stable_polls >= 2:
+                    return
 
             last_candidate = candidate
             page.wait_for_timeout(poll_ms)
@@ -369,7 +445,10 @@ class PlaywrightCdpAdapter:
         self._require_page().screenshot(path=output_path, full_page=True)
 
     def capture_latest_response_text(self) -> str:
-        return self._extract_latest_assistant_text()
+        text = self._extract_latest_assistant_text()
+        if is_intermediate_progress(text):
+            return ""
+        return text
 
     def capture_page_text(self) -> str:
         page = self._require_page()
@@ -386,10 +465,18 @@ class PlaywrightCdpAdapter:
         self._page = None
 
     def _extract_latest_assistant_text(self) -> str:
+        candidates = self._extract_assistant_text_candidates()
+        if not candidates:
+            return ""
+        ranked = sorted(candidates, key=response_quality_score, reverse=True)
+        return _normalize_text(ranked[0])
+
+    def _extract_assistant_text_candidates(self) -> list[str]:
         page = self._require_page()
         content = page.evaluate(
             """
             () => {
+                const collected = [];
                 const main = document.querySelector("main.main-chat-area");
                 if (main) {
                     const sections = Array.from(main.querySelectorAll(":scope > section"));
@@ -408,7 +495,7 @@ class PlaywrightCdpAdapter:
                         }
                         const text = (section.innerText || section.textContent || "").trim();
                         if (text) {
-                            return text;
+                            collected.push(text);
                         }
                     }
                 }
@@ -425,15 +512,24 @@ class PlaywrightCdpAdapter:
                         const node = nodes[i];
                         const text = (node.innerText || node.textContent || "").trim();
                         if (text) {
-                            return text;
+                            collected.push(text);
                         }
                     }
                 }
-                return "";
+                return collected;
             }
             """
         )
-        return _normalize_text(content or "")
+        if not isinstance(content, list):
+            return []
+        normalized = []
+        for item in content:
+            if not isinstance(item, str):
+                continue
+            text = _normalize_text(item)
+            if text:
+                normalized.append(text)
+        return normalized
 
     def _require_page(self):
         if self._page is None:

@@ -21,12 +21,22 @@ _EXECUTION_LOCK = Lock()
 
 class DeterministicPlannerClient:
     def plan(self, task_input: str) -> dict:
+        intent = task_input.strip()
         return {
-            "objective": f"Research task: {task_input}",
-            "constraints": ["run with dedicated attached browser"],
+            "objective": f"围绕用户意图“{intent}”，生成可执行的投资研究分析并输出结构化结论。",
+            "constraints": [
+                "run with dedicated attached browser",
+                "research only, no trade execution",
+                "output must include summary table and risk rating",
+            ],
             "required_outputs": ["summary", "table", "risk_rating"],
-            "steps": ["build valuecell prompt", "submit via chat", "normalize output"],
-            "risk_flags": [],
+            "steps": [
+                "clarify objective and assumptions",
+                "build a structured valuecell prompt",
+                "request evidence-backed factors and risks",
+                "normalize output into summary table and risk rating",
+            ],
+            "risk_flags": ["data_freshness", "missing_time_horizon"],
             "needs_review": True,
         }
 
@@ -44,13 +54,22 @@ class DeterministicReviewerClient:
 
 class DeterministicFinalizerClient:
     def finalize(self, plan: dict, review: dict) -> dict:
+        prompt = (
+            f"{plan['objective']}\n\n"
+            "请按以下结构输出：\n"
+            "1) 执行摘要（3-5条要点）\n"
+            "2) 风险与机会表格（factor/signal/impact/confidence）\n"
+            "3) 最终风险评级（Green/Yellow/Red）及简要依据\n"
+            "4) 未来5个交易日重点观察项（最多3条）\n"
+            "要求：避免空话，给出可解释依据，若信息不足请明确说明不确定性。"
+        )
         return {
             "target": "valuecell_web",
-            "valuecell_prompt": plan["objective"],
+            "valuecell_prompt": prompt,
             "expected_sections": ["summary", "table", "risk_rating"],
             "browser_steps": [
                 {"action": "open_chat"},
-                {"action": "fill_prompt", "content": plan["objective"]},
+                {"action": "fill_prompt", "content": prompt},
                 {"action": "submit"},
                 {"action": "wait_until_completed"},
             ],
@@ -73,6 +92,7 @@ class ExecutionService:
         started_at = datetime.now(UTC)
         run_clock_start = perf_counter()
         self._task_service.update_status(task_id, "running")
+        llm_mode = resolve_llm_mode_from_env()
         planner_client, reviewer_client, finalizer_client = build_llm_clients_from_env()
 
         stage_start = perf_counter()
@@ -107,6 +127,7 @@ class ExecutionService:
                 "revised_plan": revised_plan,
                 "final_prompt": execution_pack.valuecell_prompt,
                 "review_gate_status": review_gate_status,
+                "llm_mode": llm_mode,
             },
         )
 
@@ -119,7 +140,7 @@ class ExecutionService:
             "runner_diagnostics",
             _build_runner_diagnostics(outcome, execution_pack.timeout_seconds),
         )
-        final_result = _normalize_outcome(outcome, prompt_chain_status=review_gate_status)
+        final_result = _normalize_outcome(outcome, prompt_chain_status=review_gate_status, llm_mode=llm_mode)
         self._task_service.save_artifact(
             task_id,
             "valuecell_raw_response",
@@ -165,12 +186,16 @@ def release_execution_lock() -> None:
 
 
 def build_llm_clients_from_env():
-    import os
-
-    use_live = os.getenv("USE_LIVE_LLM", "false").lower() == "true"
+    use_live = resolve_llm_mode_from_env() == "live"
     if use_live:
         return OpenAIClient.for_planner(), GeminiClient.for_reviewer(), OpenAIClient.for_finalizer()
     return DeterministicPlannerClient(), DeterministicReviewerClient(), DeterministicFinalizerClient()
+
+
+def resolve_llm_mode_from_env() -> str:
+    import os
+
+    return "live" if os.getenv("USE_LIVE_LLM", "false").lower() == "true" else "deterministic"
 
 
 def build_runner_config_from_env() -> RunnerConfig:
@@ -262,7 +287,7 @@ def _build_orchestration_metrics(
     }
 
 
-def _normalize_outcome(outcome, *, prompt_chain_status: str) -> FinalResult:
+def _normalize_outcome(outcome, *, prompt_chain_status: str, llm_mode: str) -> FinalResult:
     parsed = {"summary": "", "highlights": [], "risk_rating": "unknown", "table": []}
     raw_response_text = (outcome.raw_response_text or "").strip()
     if not raw_response_text:
@@ -286,6 +311,7 @@ def _normalize_outcome(outcome, *, prompt_chain_status: str) -> FinalResult:
         screenshots=[outcome.screenshot_path] if outcome.screenshot_path else [],
         valuecell_raw_response=raw_response_text or None,
         prompt_chain_status=prompt_chain_status,
+        llm_mode=llm_mode,
         failed_step=outcome.failed_step,
         error_message=outcome.error_message,
     )
