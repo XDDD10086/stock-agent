@@ -180,7 +180,7 @@ def _normalize_schedule(
         interval_minutes=interval_minutes,
         timezone=timezone,
     )
-    normalized_cron = request.cron.strip() if request.trigger_type == "cron" and request.cron else None
+    normalized_cron = request.cron.strip() if request.trigger_type == "cron" and request.cron else ""
     normalized_time_of_day = request.time_of_day if request.trigger_type in {"daily", "weekly"} else None
     normalized_days = list(request.days_of_week or []) if request.trigger_type == "weekly" else []
     normalized_interval_minutes = request.interval_minutes if request.trigger_type == "interval" else None
@@ -251,7 +251,7 @@ def _to_dto(record: ScheduleRecord) -> ScheduleDTO:
         name=record.name,
         task_input=record.task_input,
         trigger_type=record.trigger_type,
-        cron=record.cron,
+        cron=record.cron if record.cron not in {"", None} else None,
         run_at_utc=record.run_at_utc,
         time_of_day=record.time_of_day,
         days_of_week=_parse_days(record.days_of_week),
