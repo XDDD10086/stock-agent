@@ -15,5 +15,6 @@ class FinalResult(BaseModel):
     valuecell_raw_response: str | None = None
     prompt_chain_status: str = "direct_pass"
     llm_mode: str = "deterministic"
+    llm_fallback_reason: str | None = None
     failed_step: str | None = None
     error_message: str | None = None

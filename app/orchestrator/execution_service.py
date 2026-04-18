@@ -94,29 +94,56 @@ class ExecutionService:
         self._task_service.update_status(task_id, "running")
         llm_mode = resolve_llm_mode_from_env()
         planner_client, reviewer_client, finalizer_client = build_llm_clients_from_env()
+        llm_fallback_reason: str | None = None
 
-        stage_start = perf_counter()
-        plan = PlannerService(client=planner_client).generate_plan(task_input)
-        plan_seconds = round(perf_counter() - stage_start, 3)
-        self._task_service.save_artifact(task_id, "plan_v1", plan.model_dump())
+        try:
+            (
+                plan,
+                review,
+                execution_pack,
+                plan_seconds,
+                review_seconds,
+                finalize_seconds,
+                review_gate_status,
+                revised_plan,
+            ) = self._run_llm_chain(
+                task_id=task_id,
+                task_input=task_input,
+                planner_client=planner_client,
+                reviewer_client=reviewer_client,
+                finalizer_client=finalizer_client,
+            )
+        except Exception as exc:
+            if llm_mode != "live":
+                raise
+            llm_fallback_reason = f"{type(exc).__name__}: {exc}"
+            self._task_service.save_artifact(
+                task_id,
+                "llm_live_error",
+                {
+                    "error_type": type(exc).__name__,
+                    "error_message": str(exc),
+                    "captured_at_utc": datetime.now(UTC).isoformat(),
+                },
+            )
+            llm_mode = "live_fallback_deterministic"
+            (
+                plan,
+                review,
+                execution_pack,
+                plan_seconds,
+                review_seconds,
+                finalize_seconds,
+                review_gate_status,
+                revised_plan,
+            ) = self._run_llm_chain(
+                task_id=task_id,
+                task_input=task_input,
+                planner_client=DeterministicPlannerClient(),
+                reviewer_client=DeterministicReviewerClient(),
+                finalizer_client=DeterministicFinalizerClient(),
+            )
 
-        stage_start = perf_counter()
-        review = ReviewService(client=reviewer_client).review_plan(plan)
-        review_seconds = round(perf_counter() - stage_start, 3)
-        self._task_service.save_artifact(task_id, "review_v1", review.model_dump())
-
-        review_gate_status = "direct_pass"
-        revised_plan = None
-        active_plan = plan
-        if not review.approved:
-            active_plan = _revise_plan_once(plan, review)
-            revised_plan = active_plan.model_dump()
-            review_gate_status = "revised_once"
-
-        stage_start = perf_counter()
-        execution_pack = FinalizeService(client=finalizer_client).build_execution_pack(active_plan, review)
-        finalize_seconds = round(perf_counter() - stage_start, 3)
-        self._task_service.save_artifact(task_id, "execution_pack", execution_pack.model_dump())
         self._task_service.save_artifact(
             task_id,
             "prompt_chain",
@@ -128,6 +155,7 @@ class ExecutionService:
                 "final_prompt": execution_pack.valuecell_prompt,
                 "review_gate_status": review_gate_status,
                 "llm_mode": llm_mode,
+                "llm_fallback_reason": llm_fallback_reason,
             },
         )
 
@@ -140,7 +168,12 @@ class ExecutionService:
             "runner_diagnostics",
             _build_runner_diagnostics(outcome, execution_pack.timeout_seconds),
         )
-        final_result = _normalize_outcome(outcome, prompt_chain_status=review_gate_status, llm_mode=llm_mode)
+        final_result = _normalize_outcome(
+            outcome,
+            prompt_chain_status=review_gate_status,
+            llm_mode=llm_mode,
+            llm_fallback_reason=llm_fallback_reason,
+        )
         self._task_service.save_artifact(
             task_id,
             "valuecell_raw_response",
@@ -168,6 +201,48 @@ class ExecutionService:
         )
         self._task_service.update_status(task_id, final_result.status)
         return final_result
+
+    def _run_llm_chain(
+        self,
+        *,
+        task_id: str,
+        task_input: str,
+        planner_client,
+        reviewer_client,
+        finalizer_client,
+    ):
+        stage_start = perf_counter()
+        plan = PlannerService(client=planner_client).generate_plan(task_input)
+        plan_seconds = round(perf_counter() - stage_start, 3)
+        self._task_service.save_artifact(task_id, "plan_v1", plan.model_dump())
+
+        stage_start = perf_counter()
+        review = ReviewService(client=reviewer_client).review_plan(plan)
+        review_seconds = round(perf_counter() - stage_start, 3)
+        self._task_service.save_artifact(task_id, "review_v1", review.model_dump())
+
+        review_gate_status = "direct_pass"
+        revised_plan = None
+        active_plan = plan
+        if not review.approved:
+            active_plan = _revise_plan_once(plan, review)
+            revised_plan = active_plan.model_dump()
+            review_gate_status = "revised_once"
+
+        stage_start = perf_counter()
+        execution_pack = FinalizeService(client=finalizer_client).build_execution_pack(active_plan, review)
+        finalize_seconds = round(perf_counter() - stage_start, 3)
+        self._task_service.save_artifact(task_id, "execution_pack", execution_pack.model_dump())
+        return (
+            plan,
+            review,
+            execution_pack,
+            plan_seconds,
+            review_seconds,
+            finalize_seconds,
+            review_gate_status,
+            revised_plan,
+        )
 
     def get_result(self, task_id: str) -> FinalResult | None:
         payload = self._task_service.get_latest_artifact(task_id, "final_result")
@@ -287,7 +362,7 @@ def _build_orchestration_metrics(
     }
 
 
-def _normalize_outcome(outcome, *, prompt_chain_status: str, llm_mode: str) -> FinalResult:
+def _normalize_outcome(outcome, *, prompt_chain_status: str, llm_mode: str, llm_fallback_reason: str | None) -> FinalResult:
     parsed = {"summary": "", "highlights": [], "risk_rating": "unknown", "table": []}
     raw_response_text = (outcome.raw_response_text or "").strip()
     if not raw_response_text:
@@ -312,6 +387,7 @@ def _normalize_outcome(outcome, *, prompt_chain_status: str, llm_mode: str) -> F
         valuecell_raw_response=raw_response_text or None,
         prompt_chain_status=prompt_chain_status,
         llm_mode=llm_mode,
+        llm_fallback_reason=llm_fallback_reason,
         failed_step=outcome.failed_step,
         error_message=outcome.error_message,
     )

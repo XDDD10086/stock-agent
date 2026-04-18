@@ -427,3 +427,28 @@
 - `FinalResult` now includes `llm_mode`.
 - `wait_until_completed` requires richer final-response signals and additional stability polls.
 - Intermediate markers like `正在执行任务/思考过程/构建分析策略` are excluded from final capture.
+
+## D-020 Live LLM Failure Fallback Policy
+
+- Date: 2026-04-18
+- Status: Accepted
+
+### Decision
+
+- If live LLM mode fails during planner/reviewer/finalizer stages (quota/network/provider error), orchestration falls back to deterministic clients for the current run.
+- Persist fallback diagnostics in artifacts:
+  - `llm_live_error`
+  - `prompt_chain.llm_fallback_reason`
+- Expose fallback status in API output:
+  - `FinalResult.llm_mode = live_fallback_deterministic`
+  - `FinalResult.llm_fallback_reason`
+
+### Rationale
+
+- Prevent user-facing `500 Internal Server Error` during manual operations.
+- Keep run continuity while preserving transparent evidence that live LLM was unavailable.
+
+### Consequences
+
+- Runs can still complete when upstream model providers reject requests.
+- Operators can identify fallback immediately from frontend result panel.

@@ -59,6 +59,10 @@ def _render_final_result(payload: dict) -> None:
     with c4:
         st.metric("LLM Mode", payload.get("llm_mode", "unknown"))
 
+    fallback_reason = payload.get("llm_fallback_reason")
+    if fallback_reason:
+        st.warning(f"LLM fallback activated: {fallback_reason}")
+
     st.write(payload.get("summary", ""))
     highlights = payload.get("highlights", [])
     if highlights:

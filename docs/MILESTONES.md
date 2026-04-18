@@ -453,6 +453,15 @@
   - ranks multiple assistant candidates and selects best-quality response
 - Local manual-test profile updated to `USE_LIVE_LLM=true` for real OpenAI/Gemini verification.
 
+### Completed Work (Checkpoint 5 - Live Failure Fallback)
+
+- Added live-mode failure fallback to deterministic LLM chain for run continuity.
+- Added fallback diagnostics and surfacing:
+  - `llm_live_error` artifact
+  - `prompt_chain.llm_fallback_reason`
+  - `FinalResult.llm_fallback_reason`
+- Streamlit result panel now warns when fallback is activated.
+
 ### Verification Evidence
 
 - Command: `.venv/bin/python -m pytest tests/test_valuecell_runner_contract.py tests/test_tasks_api.py tests/test_schedules_api.py -q`
@@ -460,4 +469,4 @@
 - Command: `.venv/bin/python -m pytest tests/test_valuecell_heuristics.py tests/test_valuecell_wait_logic.py tests/test_tasks_api.py tests/test_schedules_api.py tests/test_valuecell_runner_contract.py -q`
 - Result: `23 passed`
 - Command: `.venv/bin/python -m pytest -q`
-- Result: `37 passed`
+- Result: `38 passed`

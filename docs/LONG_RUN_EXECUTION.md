@@ -51,6 +51,7 @@
 - M6 checkpoint 2 complete: ValueCell raw assistant response roundtrip to API + frontend dual-panel rendering.
 - M6 checkpoint 3 complete: scheduler trigger matrix (`once/cron/daily/weekly`) + patch/run-once APIs + sqlite compat migration.
 - M6 checkpoint 4 complete: llm-mode visibility + stricter ValueCell completion heuristics to prevent premature capture.
+- M6 checkpoint 5 complete: live-provider failure fallback to deterministic with explicit diagnostics (no user-facing 500).
 - Next focus: optional post-MVP refinements (async worker model, richer parser schema, CI matrix).
 
 ## Active Long Task Plan
@@ -64,6 +65,7 @@
 7. [x] Add one-command startup/smoke scripts for MVP handoff.
 8. [x] Implement M6 pipeline hardening and scheduler expansion with full regression tests.
 9. [x] Fix post-acceptance issues: enforce visible LLM mode and block intermediate-response false positives.
+10. [x] Add runtime fallback guard for live-LLM quota/provider errors.
 
 ## Definition of Progress
 

@@ -83,6 +83,11 @@ class RevisionFinalizerClient:
         }
 
 
+class FailingLivePlannerClient:
+    def plan(self, task_input: str) -> dict:
+        raise RuntimeError("insufficient_quota")
+
+
 def _client(db_url: str | None = None) -> TestClient:
     if db_url is None:
         db_url = f"sqlite:///./data/test_app_{uuid4().hex}.db"
@@ -234,3 +239,33 @@ def test_prompt_gate_revises_once_when_review_not_approved(monkeypatch):
     assert chain_payload["revised_plan"] is not None
     assert chain_payload["final_prompt"] != "simple intent"
     assert "(review-adjusted)" in chain_payload["final_prompt"]
+
+
+def test_live_llm_failure_falls_back_to_deterministic(monkeypatch):
+    monkeypatch.setattr(
+        "app.orchestrator.execution_service.resolve_llm_mode_from_env",
+        lambda: "live",
+    )
+    monkeypatch.setattr(
+        "app.orchestrator.execution_service.build_llm_clients_from_env",
+        lambda: (FailingLivePlannerClient(), RevisionReviewerClient(), RevisionFinalizerClient()),
+    )
+    client = _client()
+    created = client.post("/tasks", json={"input": "fallback check"}).json()
+
+    run_response = client.post(f"/tasks/{created['task_id']}/run")
+    assert run_response.status_code == 200
+    payload = run_response.json()
+    assert payload["status"] == "completed"
+    assert payload["llm_mode"] == "live_fallback_deterministic"
+    assert payload["llm_fallback_reason"]
+
+    prompt_chain = client.get(f"/tasks/{created['task_id']}/artifacts/prompt_chain")
+    assert prompt_chain.status_code == 200
+    chain_payload = prompt_chain.json()["payload"]
+    assert chain_payload["llm_mode"] == "live_fallback_deterministic"
+    assert chain_payload["llm_fallback_reason"]
+
+    llm_live_error = client.get(f"/tasks/{created['task_id']}/artifacts/llm_live_error")
+    assert llm_live_error.status_code == 200
+    assert llm_live_error.json()["payload"]["error_type"] == "RuntimeError"
