@@ -16,6 +16,8 @@ REQUIRED_ARTIFACTS = {
     "final_result",
     "runner_diagnostics",
     "orchestration_metrics",
+    "committee_chain",
+    "committee_result",
 }
 
 

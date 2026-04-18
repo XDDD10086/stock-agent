@@ -51,7 +51,7 @@ def _call(label: str, fn):
 
 def _render_final_result(payload: dict) -> None:
     st.markdown("#### Structured Result")
-    c1, c2, c3, c4 = st.columns(4)
+    c1, c2, c3, c4, c5 = st.columns(5)
     with c1:
         st.metric("Status", payload.get("status", "unknown"))
     with c2:
@@ -60,21 +60,41 @@ def _render_final_result(payload: dict) -> None:
         st.metric("Prompt Chain", payload.get("prompt_chain_status", "unknown"))
     with c4:
         st.metric("LLM Mode", payload.get("llm_mode", "unknown"))
+    with c5:
+        st.metric("Committee", payload.get("committee_status", "unknown"))
 
     fallback_reason = payload.get("llm_fallback_reason")
     if fallback_reason:
         st.warning(f"LLM fallback activated: {fallback_reason}")
 
-    st.write(payload.get("summary", ""))
-    highlights = payload.get("highlights", [])
-    if highlights:
-        st.write("Highlights:")
-        for item in highlights:
-            st.write(f"- {item}")
+    committee_fallback = payload.get("committee_fallback_reason")
+    committee_summary = payload.get("committee_summary")
+    committee_actions = payload.get("committee_actions") or []
 
-    table_rows = payload.get("table", [])
-    if table_rows:
-        st.dataframe(table_rows, use_container_width=True)
+    st.markdown("#### Committee 建议（易懂版）")
+    if committee_summary:
+        st.write(committee_summary)
+    if committee_actions:
+        for idx, item in enumerate(committee_actions, start=1):
+            action = item.get("action", "")
+            reason = item.get("reason", "")
+            st.markdown(f"{idx}. **{action}**")
+            if reason:
+                st.caption(f"原因：{reason}")
+    if committee_fallback:
+        st.warning(f"Committee fallback: {committee_fallback}")
+
+    with st.expander("Structured Legacy View", expanded=False):
+        st.write(payload.get("summary", ""))
+        highlights = payload.get("highlights", [])
+        if highlights:
+            st.write("Highlights:")
+            for item in highlights:
+                st.write(f"- {item}")
+
+        table_rows = payload.get("table", [])
+        if table_rows:
+            st.dataframe(table_rows, use_container_width=True)
 
     with st.expander("ValueCell Raw Response", expanded=False):
         raw_text = payload.get("valuecell_raw_response") or "(empty)"
