@@ -482,6 +482,14 @@
 - Relaxed send-state detection from `visible+enabled` to `visible` to handle disabled paper-plane after answer is complete.
 - Added wait-loop tests for completion-UI gating and capture-stage gating.
 
+### Completed Work (Checkpoint 8 - Mixed Label Final Text Recognition)
+
+- Fixed false-negative completion when final answer block contains both:
+  - progress/thinking labels (for example `思考过程`)
+  - final markers (`已完成任务/执行摘要/风险评级`)
+- Updated final-candidate heuristics to prioritize completion markers over mixed-label noise.
+- Verified on live attached ValueCell page: completion wait returns immediately when final block is already complete.
+
 ### Verification Evidence
 
 - Command: `.venv/bin/python -m pytest tests/test_valuecell_runner_contract.py tests/test_tasks_api.py tests/test_schedules_api.py -q`
@@ -494,3 +502,5 @@
 - Result: `39 passed`
 - Command: `.venv/bin/python -m pytest -q`
 - Result: `41 passed`
+- Command: `.venv/bin/python -m pytest -q`
+- Result: `42 passed`

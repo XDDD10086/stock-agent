@@ -496,3 +496,4 @@
 
 - `wait_until_completed` now gates on `completion_ui_ready` instead of strict enabled-send-only checks.
 - `capture_latest_response_text` uses the same completion signal for consistency.
+- Completion markers (`已完成任务/执行摘要/风险评级`) can now override "thinking label" noise (`思考过程`) inside the same final block.

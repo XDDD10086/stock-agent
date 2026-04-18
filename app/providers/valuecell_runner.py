@@ -112,7 +112,7 @@ def has_meaningful_response(text: str) -> bool:
         return False
     if is_generation_in_progress(normalized):
         return False
-    if is_intermediate_progress(normalized):
+    if is_intermediate_progress(normalized) and not has_completion_signals(normalized):
         return False
 
     # Heuristic: require enough semantic signal to avoid treating placeholder
@@ -142,10 +142,10 @@ def is_final_response_candidate(text: str) -> bool:
     normalized = _normalize_text(text)
     if not has_meaningful_response(normalized):
         return False
-    if is_intermediate_progress(normalized):
-        return False
     if has_completion_signals(normalized):
         return True
+    if is_intermediate_progress(normalized):
+        return False
     return len(normalized) >= 180
 
 
@@ -155,12 +155,13 @@ def response_quality_score(text: str) -> int:
         return -10_000
 
     score = len(normalized)
-    if has_completion_signals(normalized):
+    completion_signal = has_completion_signals(normalized)
+    if completion_signal:
         score += 400
     if is_generation_in_progress(normalized):
         score -= 600
     if is_intermediate_progress(normalized):
-        score -= 800
+        score -= 180 if completion_signal else 800
     if not has_meaningful_response(normalized):
         score -= 400
     return score
@@ -445,7 +446,7 @@ class PlaywrightCdpAdapter:
         if not self._is_completion_ui_ready():
             return ""
         text = self._extract_latest_assistant_text()
-        if is_intermediate_progress(text):
+        if is_intermediate_progress(text) and not has_completion_signals(text):
             return ""
         return text
 

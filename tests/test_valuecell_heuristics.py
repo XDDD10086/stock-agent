@@ -32,3 +32,9 @@ def test_intermediate_progress_text_is_not_treated_as_final():
 def test_final_candidate_requires_completion_signals_or_richer_content():
     assert is_final_response_candidate("执行摘要：公司现金流稳健。风险评级：黄灯。建议关注估值回落。")
     assert not is_final_response_candidate("短句但无结构")
+
+
+def test_final_candidate_allows_completion_text_that_contains_thinking_labels():
+    text = "ValueCell 已完成任务 展开 思考过程 执行摘要：公司现金流稳健。风险评级：黄灯。建议关注估值与成交量。"
+    assert has_meaningful_response(text)
+    assert is_final_response_candidate(text)
