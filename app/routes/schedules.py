@@ -59,15 +59,15 @@ def build_schedules_router(
             db.close()
 
     def _ensure_once_time_is_future(dto: ScheduleResponse) -> None:
-        if dto.trigger_type != "once":
+        if dto.trigger_type not in {"once", "one-off"}:
             return
         if dto.run_at_utc is None:
-            raise HTTPException(status_code=400, detail="once schedule requires run_at_utc")
+            raise HTTPException(status_code=400, detail="once/one-off schedule requires run_at_utc")
         run_at_utc = dto.run_at_utc
         if run_at_utc.tzinfo is None:
             run_at_utc = run_at_utc.replace(tzinfo=UTC)
         if run_at_utc <= datetime.now(UTC):
-            raise HTTPException(status_code=400, detail="once schedule run_at_local must be in the future")
+            raise HTTPException(status_code=400, detail="once/one-off schedule run_at_local must be in the future")
 
     def _sync_scheduler_job(service: ScheduleService, dto: ScheduleResponse) -> ScheduleResponse:
         if not enable_scheduler:
@@ -88,6 +88,7 @@ def build_schedules_router(
             run_at_utc=dto.run_at_utc,
             time_of_day=dto.time_of_day,
             days_of_week=dto.days_of_week,
+            interval_minutes=dto.interval_minutes,
             timezone=dto.timezone,
             callback=_run_scheduled_task,
             kwargs={"task_input": dto.task_input},
@@ -107,6 +108,7 @@ def build_schedules_router(
                 run_at_local=payload.run_at_local,
                 time_of_day=payload.time_of_day,
                 days_of_week=list(payload.days_of_week or []),
+                interval_minutes=payload.interval_minutes,
                 timezone=payload.timezone,
             )
             response = ScheduleResponse(**dto.__dict__)

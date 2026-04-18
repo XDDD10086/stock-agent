@@ -20,5 +20,7 @@ class FinalResult(BaseModel):
     committee_summary: str | None = None
     committee_actions: list[dict] = Field(default_factory=list)
     committee_fallback_reason: str | None = None
+    committee_report_json: dict | None = None
+    committee_report_markdown: str | None = None
     failed_step: str | None = None
     error_message: str | None = None

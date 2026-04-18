@@ -173,6 +173,11 @@ def test_run_and_result_endpoints():
     assert run_payload["committee_summary"]
     assert run_payload["committee_actions"]
     assert run_payload["committee_fallback_reason"] is None
+    assert run_payload["committee_report_json"]
+    assert run_payload["committee_report_markdown"]
+    assert run_payload["committee_report_json"]["report_title"] == "投资组合风险诊断与执行建议报告"
+    assert "next_5d_action_plan" in run_payload["committee_report_json"]
+    assert "## 5. 未来 5 个交易日行动清单" in run_payload["committee_report_markdown"]
 
     result_response = client.get(f"/tasks/{created['task_id']}/result")
     assert result_response.status_code == 200
@@ -186,6 +191,8 @@ def test_run_and_result_endpoints():
     assert result_payload["committee_status"] == "completed"
     assert result_payload["committee_summary"]
     assert result_payload["committee_actions"]
+    assert result_payload["committee_report_json"]
+    assert result_payload["committee_report_markdown"]
 
     artifacts_response = client.get(f"/tasks/{created['task_id']}/artifacts")
     assert artifacts_response.status_code == 200
@@ -233,6 +240,8 @@ def test_run_and_result_endpoints():
     assert committee_result.status_code == 200
     assert committee_result.json()["payload"]["committee_status"] == "completed"
     assert committee_result.json()["payload"]["committee_actions"]
+    assert committee_result.json()["payload"]["committee_report_json"]
+    assert committee_result.json()["payload"]["committee_report_markdown"]
 
 
 def test_run_endpoint_returns_409_when_runner_busy():
@@ -317,12 +326,16 @@ def test_committee_failure_degrades_to_fallback_without_failing_task(monkeypatch
     assert payload["committee_status"] == "fallback"
     assert payload["committee_fallback_reason"]
     assert payload["summary"]
+    assert payload["committee_report_json"] is None
+    assert payload["committee_report_markdown"] is None
 
     committee_result = client.get(f"/tasks/{created['task_id']}/artifacts/committee_result")
     assert committee_result.status_code == 200
     committee_payload = committee_result.json()["payload"]
     assert committee_payload["committee_status"] == "fallback"
     assert committee_payload["committee_fallback_reason"]
+    assert committee_payload["committee_report_json"] is None
+    assert committee_payload["committee_report_markdown"] is None
 
 
 def test_committee_skips_when_run_needs_manual_intervention():
@@ -336,3 +349,5 @@ def test_committee_skips_when_run_needs_manual_intervention():
     assert payload["committee_status"] == "skipped_not_completed"
     assert payload["committee_actions"] == []
     assert payload["committee_summary"] is None
+    assert payload["committee_report_json"] is None
+    assert payload["committee_report_markdown"] is None

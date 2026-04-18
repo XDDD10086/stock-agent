@@ -147,6 +147,66 @@ def test_schedule_supports_once_daily_weekly_and_patch_update():
     assert updated_payload["enabled"] is False
 
 
+def test_schedule_supports_one_off_and_interval_trigger_types():
+    client = _client()
+    run_at_local = (datetime.now().replace(microsecond=0) + timedelta(hours=3)).isoformat()
+
+    one_off_created = client.post(
+        "/schedules",
+        json={
+            "name": "one_off_scan",
+            "task_input": "one off portfolio check",
+            "trigger_type": "one-off",
+            "run_at_local": run_at_local,
+            "timezone": "America/New_York",
+        },
+    )
+    assert one_off_created.status_code == 200
+    one_off_payload = one_off_created.json()
+    assert one_off_payload["trigger_type"] == "one-off"
+    assert one_off_payload["run_at_utc"] is not None
+
+    interval_created = client.post(
+        "/schedules",
+        json={
+            "name": "interval_scan",
+            "task_input": "interval risk check",
+            "trigger_type": "interval",
+            "interval_minutes": 30,
+            "timezone": "America/New_York",
+        },
+    )
+    assert interval_created.status_code == 200
+    interval_payload = interval_created.json()
+    assert interval_payload["trigger_type"] == "interval"
+    assert interval_payload["interval_minutes"] == 30
+
+    interval_id = interval_payload["id"]
+    updated = client.patch(
+        f"/schedules/{interval_id}",
+        json={
+            "trigger_type": "interval",
+            "interval_minutes": 45,
+        },
+    )
+    assert updated.status_code == 200
+    assert updated.json()["interval_minutes"] == 45
+
+
+def test_interval_schedule_requires_interval_minutes():
+    client = _client()
+    created = client.post(
+        "/schedules",
+        json={
+            "name": "invalid_interval",
+            "task_input": "invalid interval schedule",
+            "trigger_type": "interval",
+            "timezone": "America/New_York",
+        },
+    )
+    assert created.status_code == 422
+
+
 def test_run_once_endpoint_executes_and_returns_final_result():
     client = _client()
     created = client.post(
@@ -169,6 +229,9 @@ def test_run_once_endpoint_executes_and_returns_final_result():
     assert payload["valuecell_raw_response"]
     assert payload["prompt_chain_status"] in {"direct_pass", "revised_once"}
     assert payload["committee_status"] in {"completed", "fallback"}
+    if payload["committee_status"] == "completed":
+        assert payload["committee_report_json"] is not None
+        assert payload["committee_report_markdown"] is not None
 
 
 def test_once_schedule_rejects_past_local_time():

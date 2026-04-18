@@ -70,6 +70,8 @@ def _render_final_result(payload: dict) -> None:
     committee_fallback = payload.get("committee_fallback_reason")
     committee_summary = payload.get("committee_summary")
     committee_actions = payload.get("committee_actions") or []
+    committee_report_markdown = payload.get("committee_report_markdown")
+    committee_report_json = payload.get("committee_report_json")
 
     st.markdown("#### Committee 建议（易懂版）")
     if committee_summary:
@@ -83,6 +85,14 @@ def _render_final_result(payload: dict) -> None:
                 st.caption(f"原因：{reason}")
     if committee_fallback:
         st.warning(f"Committee fallback: {committee_fallback}")
+
+    if committee_report_markdown:
+        st.markdown("#### Committee 完整执行报告")
+        st.markdown(committee_report_markdown)
+
+    if committee_report_json:
+        with st.expander("Committee Report JSON", expanded=False):
+            st.json(committee_report_json)
 
     with st.expander("Structured Legacy View", expanded=False):
         st.write(payload.get("summary", ""))
@@ -265,14 +275,20 @@ def _render_schedule_tab() -> None:
     st.subheader("Create Schedule")
     schedule_name = st.text_input("Schedule Name", value="daily_scan")
     schedule_input = st.text_input("Schedule Task Input", value="scan daily portfolio")
-    schedule_trigger = st.selectbox("Trigger Type", ["cron", "once", "daily", "weekly"], index=0)
+    schedule_trigger = st.selectbox("Trigger Type", ["cron", "once", "one-off", "daily", "weekly", "interval"], index=0)
     col_left, col_right = st.columns(2)
     with col_left:
         schedule_timezone = st.text_input("Timezone", value="America/New_York")
         schedule_cron = st.text_input("Cron (for cron)", value="0 12 * * *")
         schedule_time_of_day = st.text_input("Time of Day HH:MM (daily/weekly)", value="09:30")
+        schedule_interval_minutes = st.number_input(
+            "Interval Minutes (interval)",
+            min_value=1,
+            step=1,
+            value=30,
+        )
     with col_right:
-        schedule_run_at_local = st.text_input("Run At Local (once, YYYY-MM-DD HH:MM)", value="")
+        schedule_run_at_local = st.text_input("Run At Local (once/one-off, YYYY-MM-DD HH:MM)", value="")
         schedule_days = st.multiselect(
             "Days of Week (weekly)",
             options=["mon", "tue", "wed", "thu", "fri", "sat", "sun"],
@@ -287,8 +303,10 @@ def _render_schedule_tab() -> None:
         }
         if schedule_trigger == "cron":
             payload_input["cron"] = schedule_cron
-        if schedule_trigger == "once" and schedule_run_at_local.strip():
+        if schedule_trigger in {"once", "one-off"} and schedule_run_at_local.strip():
             payload_input["run_at_local"] = schedule_run_at_local.strip()
+        if schedule_trigger == "interval":
+            payload_input["interval_minutes"] = int(schedule_interval_minutes)
         if schedule_trigger in {"daily", "weekly"}:
             payload_input["time_of_day"] = schedule_time_of_day.strip()
         if schedule_trigger == "weekly":
@@ -332,13 +350,24 @@ def _render_schedule_tab() -> None:
                 _render_final_result(payload)
 
     st.markdown("##### Update Schedule (Partial)")
-    update_trigger = st.selectbox("Update Trigger Type (optional)", ["", "cron", "once", "daily", "weekly"], index=0)
+    update_trigger = st.selectbox(
+        "Update Trigger Type (optional)",
+        ["", "cron", "once", "one-off", "daily", "weekly", "interval"],
+        index=0,
+    )
     u1, u2 = st.columns(2)
     with u1:
         update_name = st.text_input("Update Name (optional)", value="")
         update_task_input = st.text_input("Update Task Input (optional)", value="")
         update_timezone = st.text_input("Update Timezone (optional)", value="")
         update_cron = st.text_input("Update Cron (optional)", value="")
+        update_interval_minutes = st.number_input(
+            "Update Interval Minutes (optional, interval)",
+            min_value=1,
+            step=1,
+            value=30,
+            key="update_interval_minutes",
+        )
     with u2:
         update_run_at_local = st.text_input("Update Run At Local (optional)", value="")
         update_time_of_day = st.text_input("Update Time of Day HH:MM (optional)", value="")
@@ -362,6 +391,8 @@ def _render_schedule_tab() -> None:
             update_payload["timezone"] = update_timezone.strip()
         if update_cron.strip():
             update_payload["cron"] = update_cron.strip()
+        if update_trigger == "interval":
+            update_payload["interval_minutes"] = int(update_interval_minutes)
         if update_run_at_local.strip():
             update_payload["run_at_local"] = update_run_at_local.strip()
         if update_time_of_day.strip():

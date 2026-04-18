@@ -53,3 +53,26 @@ Requirements:
 - Force `target=valuecell_web` and minimal browser step sequence.
 - Force `expected_sections` to include `summary`, `table`, `risk_rating`.
 - Encode risk-rating instruction (Green/Yellow/Red) inside `valuecell_prompt`.
+
+## Committee Prompts
+
+Files:
+
+- `app/prompts/committee_draft_system.md`
+- `app/prompts/committee_review_system.md`
+- `app/prompts/committee_finalize_system.md`
+
+Requirements:
+
+- Committee chain order:
+  - GPT-5.4 draft
+  - Gemini 3.1 Pro review
+  - GPT-5.4 finalize
+- Finalizer output must include:
+  - `committee_summary`
+  - `committee_actions`
+  - `detailed_report` (portfolio risk diagnosis execution report JSON)
+- Finalizer must preserve key numbers from source material when available.
+- If evidence is missing, finalizer must explicitly state:
+  - `材料未提供，暂无法确认`
+- Finalizer report must provide 5-trading-day action framework and trigger logic.

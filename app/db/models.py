@@ -44,6 +44,7 @@ class ScheduleRecord(Base):
     run_at_utc: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     time_of_day: Mapped[str | None] = mapped_column(String(5), nullable=True)
     days_of_week: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    interval_minutes: Mapped[int | None] = mapped_column(Integer, nullable=True)
     timezone: Mapped[str] = mapped_column(String(64), default="America/New_York")
     enabled: Mapped[bool] = mapped_column(default=True)
     next_run_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

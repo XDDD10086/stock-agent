@@ -56,6 +56,8 @@
 - M6 checkpoint 7 complete: completion detection now accepts reply action-bar (`复制/保存/详情`) and disabled paper-plane visibility.
 - M6 checkpoint 8 complete: mixed final text with `思考过程` labels no longer blocks completion when final markers are present.
 - M7 checkpoint 1 complete: post-ValueCell committee chain (GPT draft -> Gemini review -> GPT finalize) with fallback-safe output.
+- M7 checkpoint 2 complete: committee output upgraded to report-mode (`committee_report_json` + markdown rendering) with stronger finalizer prompt constraints.
+- M7 checkpoint 3 complete: scheduler trigger matrix expanded with `one-off` and `interval(interval_minutes)` plus API test coverage.
 - Next focus: optional post-MVP refinements (async worker model, richer parser schema, CI matrix).
 
 ## Active Long Task Plan
@@ -74,6 +76,8 @@
 12. [x] Add completion action-bar signal and visible-send fallback for ValueCell finished-state detection.
 13. [x] Allow completion markers to override noisy thinking labels in final response blocks.
 14. [x] Add committee summarization chain and committee-first frontend presentation.
+15. [x] Upgrade committee from summary-actions to report-grade output schema and UI rendering.
+16. [x] Add scheduler `one-off` and `interval` triggers with persistence/scheduler wiring/tests.
 
 ## Definition of Progress
 

@@ -20,6 +20,7 @@ class ScheduleDTO:
     run_at_utc: datetime | None
     time_of_day: str | None
     days_of_week: list[str]
+    interval_minutes: int | None
     timezone: str
     enabled: bool
     next_run_at: datetime | None
@@ -33,6 +34,7 @@ class NormalizedScheduleInput:
     run_at_utc: datetime | None
     time_of_day: str | None
     days_of_week: list[str]
+    interval_minutes: int | None
     timezone: str
 
 
@@ -50,6 +52,7 @@ class ScheduleService:
         run_at_local: datetime | None,
         time_of_day: str | None,
         days_of_week: list[str] | None,
+        interval_minutes: int | None,
         timezone: str,
     ) -> ScheduleDTO:
         normalized = _normalize_schedule(
@@ -58,6 +61,7 @@ class ScheduleService:
             run_at_local=run_at_local,
             time_of_day=time_of_day,
             days_of_week=days_of_week,
+            interval_minutes=interval_minutes,
             timezone=timezone,
         )
         record = ScheduleRecord(
@@ -68,9 +72,10 @@ class ScheduleService:
             run_at_utc=normalized.run_at_utc,
             time_of_day=normalized.time_of_day,
             days_of_week=_serialize_days(normalized.days_of_week),
+            interval_minutes=normalized.interval_minutes,
             timezone=normalized.timezone,
             enabled=True,
-            next_run_at=normalized.run_at_utc if normalized.trigger_type == "once" else None,
+            next_run_at=normalized.run_at_utc if normalized.trigger_type in {"once", "one-off"} else None,
             created_at=datetime.now(UTC),
         )
         self._db.add(record)
@@ -100,6 +105,7 @@ class ScheduleService:
             run_at_local=merged["run_at_local"],
             time_of_day=merged["time_of_day"],
             days_of_week=merged["days_of_week"],
+            interval_minutes=merged["interval_minutes"],
             timezone=merged["timezone"],
         )
 
@@ -115,8 +121,9 @@ class ScheduleService:
         record.run_at_utc = normalized.run_at_utc
         record.time_of_day = normalized.time_of_day
         record.days_of_week = _serialize_days(normalized.days_of_week)
+        record.interval_minutes = normalized.interval_minutes
         record.timezone = normalized.timezone
-        record.next_run_at = normalized.run_at_utc if normalized.trigger_type == "once" else None
+        record.next_run_at = normalized.run_at_utc if normalized.trigger_type in {"once", "one-off"} else None
 
         self._db.add(record)
         self._db.commit()
@@ -159,6 +166,7 @@ def _normalize_schedule(
     run_at_local: datetime | None,
     time_of_day: str | None,
     days_of_week: list[str] | None,
+    interval_minutes: int | None,
     timezone: str,
 ) -> NormalizedScheduleInput:
     request = ScheduleCreateRequest(
@@ -169,18 +177,25 @@ def _normalize_schedule(
         run_at_local=run_at_local,
         time_of_day=time_of_day,
         days_of_week=days_of_week,
+        interval_minutes=interval_minutes,
         timezone=timezone,
     )
+    normalized_cron = request.cron.strip() if request.trigger_type == "cron" and request.cron else None
+    normalized_time_of_day = request.time_of_day if request.trigger_type in {"daily", "weekly"} else None
+    normalized_days = list(request.days_of_week or []) if request.trigger_type == "weekly" else []
+    normalized_interval_minutes = request.interval_minutes if request.trigger_type == "interval" else None
+
     run_at_utc = None
-    if request.trigger_type == "once" and request.run_at_local is not None:
+    if request.trigger_type in {"once", "one-off"} and request.run_at_local is not None:
         run_at_utc = _to_utc(request.run_at_local, request.timezone)
 
     return NormalizedScheduleInput(
         trigger_type=request.trigger_type,
-        cron=request.cron.strip() if request.cron else None,
+        cron=normalized_cron,
         run_at_utc=run_at_utc,
-        time_of_day=request.time_of_day,
-        days_of_week=list(request.days_of_week or []),
+        time_of_day=normalized_time_of_day,
+        days_of_week=normalized_days,
+        interval_minutes=normalized_interval_minutes,
         timezone=request.timezone,
     )
 
@@ -222,6 +237,9 @@ def _merge_update_payload(record: ScheduleRecord, payload: ScheduleUpdateRequest
         "run_at_local": payload.run_at_local if payload.run_at_local is not None else run_at_local,
         "time_of_day": payload.time_of_day if payload.time_of_day is not None else record.time_of_day,
         "days_of_week": payload.days_of_week if payload.days_of_week is not None else _parse_days(record.days_of_week),
+        "interval_minutes": (
+            payload.interval_minutes if payload.interval_minutes is not None else record.interval_minutes
+        ),
         "timezone": payload.timezone or record.timezone,
     }
     return merged
@@ -237,6 +255,7 @@ def _to_dto(record: ScheduleRecord) -> ScheduleDTO:
         run_at_utc=record.run_at_utc,
         time_of_day=record.time_of_day,
         days_of_week=_parse_days(record.days_of_week),
+        interval_minutes=record.interval_minutes,
         timezone=record.timezone,
         enabled=record.enabled,
         next_run_at=record.next_run_at,

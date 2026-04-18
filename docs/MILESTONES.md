@@ -511,6 +511,28 @@
   - legacy structured result and raw ValueCell content remain expandable
 - Smoke validation upgraded to require `committee_chain` and `committee_result` artifacts.
 
+### Completed Work (Checkpoint 10 - Committee Report Upgrade + Scheduler Trigger Expansion)
+
+- Committee final output upgraded to report-mode contract:
+  - `committee_report_json`
+  - `committee_report_markdown`
+- Finalizer prompt now enforces:
+  - report-grade structure
+  - key-number preservation
+  - missing-data explicit declaration
+  - 5-trading-day trigger/action framework
+- Streamlit result panel now renders full committee markdown report in main result area.
+- Scheduler trigger matrix expanded with:
+  - `one-off` (alongside legacy `once`)
+  - `interval` with `interval_minutes`
+- APScheduler integration now supports `IntervalTrigger`.
+- SQLite compat migration extended with:
+  - `schedules.interval_minutes`
+- Added API tests for:
+  - `one-off` create flow
+  - `interval` create/update flow
+  - interval validation failure path
+
 ### Verification Evidence
 
 - Command: `.venv/bin/python -m pytest tests/test_valuecell_runner_contract.py tests/test_tasks_api.py tests/test_schedules_api.py -q`
@@ -529,3 +551,5 @@
 - Result: `47 passed`
 - Command: `./scripts/smoke_mvp.sh --skip-schedule-check --allow-manual-intervention` (API running, CDP attached)
 - Result: all PASS checkpoints including committee artifact presence
+- Command: `.venv/bin/python -m pytest -q`
+- Result: `49 passed`

@@ -24,3 +24,4 @@ class CommitteeReviewV1(BaseModel):
 class CommitteeResultV1(BaseModel):
     committee_summary: str
     committee_actions: list[CommitteeAction] = Field(default_factory=list)
+    detailed_report: dict = Field(default_factory=dict)

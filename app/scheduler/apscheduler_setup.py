@@ -7,6 +7,7 @@ from threading import Lock
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.date import DateTrigger
 from apscheduler.triggers.cron import CronTrigger
+from apscheduler.triggers.interval import IntervalTrigger
 
 _scheduler: BackgroundScheduler | None = None
 _lock = Lock()
@@ -30,6 +31,7 @@ def upsert_schedule_job(
     run_at_utc: datetime | None,
     time_of_day: str | None,
     days_of_week: list[str] | None,
+    interval_minutes: int | None,
     timezone: str,
     callback: Callable[..., None],
     kwargs: dict,
@@ -41,6 +43,7 @@ def upsert_schedule_job(
         run_at_utc=run_at_utc,
         time_of_day=time_of_day,
         days_of_week=days_of_week or [],
+        interval_minutes=interval_minutes,
         timezone=timezone,
     )
     job = scheduler.add_job(
@@ -62,6 +65,7 @@ def _build_trigger(
     run_at_utc: datetime | None,
     time_of_day: str | None,
     days_of_week: list[str],
+    interval_minutes: int | None,
     timezone: str,
 ):
     if trigger_type == "cron":
@@ -69,12 +73,17 @@ def _build_trigger(
             raise ValueError("cron_expr is required for cron trigger")
         return CronTrigger.from_crontab(cron_expr, timezone=timezone)
 
-    if trigger_type == "once":
+    if trigger_type in {"once", "one-off"}:
         if run_at_utc is None:
-            raise ValueError("run_at_utc is required for once trigger")
+            raise ValueError("run_at_utc is required for once/one-off trigger")
         if run_at_utc.tzinfo is None:
             run_at_utc = run_at_utc.replace(tzinfo=UTC)
         return DateTrigger(run_date=run_at_utc, timezone="UTC")
+
+    if trigger_type == "interval":
+        if interval_minutes is None or interval_minutes <= 0:
+            raise ValueError("interval_minutes is required for interval trigger")
+        return IntervalTrigger(minutes=interval_minutes, timezone=timezone)
 
     if time_of_day is None:
         raise ValueError("time_of_day is required for daily/weekly trigger")

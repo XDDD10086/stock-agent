@@ -22,6 +22,7 @@ def apply_sqlite_compat_migrations(engine: Engine) -> None:
             "run_at_utc": "DATETIME",
             "time_of_day": "VARCHAR(5)",
             "days_of_week": "VARCHAR(64)",
+            "interval_minutes": "INTEGER",
         }
         for column_name, column_type in additions.items():
             if column_name in existing_columns:

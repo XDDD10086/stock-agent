@@ -6,7 +6,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field, model_validator
 
-TriggerType = Literal["cron", "once", "daily", "weekly"]
+TriggerType = Literal["cron", "once", "one-off", "daily", "weekly", "interval"]
 Weekday = Literal["mon", "tue", "wed", "thu", "fri", "sat", "sun"]
 
 _VALID_WEEKDAYS = {"mon", "tue", "wed", "thu", "fri", "sat", "sun"}
@@ -43,6 +43,7 @@ class ScheduleCreateRequest(BaseModel):
     run_at_local: datetime | None = None
     time_of_day: str | None = None
     days_of_week: list[Weekday] | list[str] | None = None
+    interval_minutes: int | None = Field(default=None, ge=1)
     timezone: str = "America/New_York"
 
     @model_validator(mode="after")
@@ -54,9 +55,9 @@ class ScheduleCreateRequest(BaseModel):
         if self.trigger_type == "cron":
             if not self.cron or not self.cron.strip():
                 raise ValueError("cron is required when trigger_type=cron")
-        elif self.trigger_type == "once":
+        elif self.trigger_type in {"once", "one-off"}:
             if self.run_at_local is None:
-                raise ValueError("run_at_local is required when trigger_type=once")
+                raise ValueError("run_at_local is required when trigger_type=once/one-off")
         elif self.trigger_type == "daily":
             if self.time_of_day is None:
                 raise ValueError("time_of_day is required when trigger_type=daily")
@@ -65,6 +66,9 @@ class ScheduleCreateRequest(BaseModel):
                 raise ValueError("time_of_day is required when trigger_type=weekly")
             if not normalized_days:
                 raise ValueError("days_of_week is required when trigger_type=weekly")
+        elif self.trigger_type == "interval":
+            if self.interval_minutes is None:
+                raise ValueError("interval_minutes is required when trigger_type=interval")
         return self
 
 
@@ -76,6 +80,7 @@ class ScheduleUpdateRequest(BaseModel):
     run_at_local: datetime | None = None
     time_of_day: str | None = None
     days_of_week: list[Weekday] | list[str] | None = None
+    interval_minutes: int | None = Field(default=None, ge=1)
     timezone: str | None = None
     enabled: bool | None = None
 
@@ -96,6 +101,7 @@ class ScheduleResponse(BaseModel):
     run_at_utc: datetime | None
     time_of_day: str | None
     days_of_week: list[str]
+    interval_minutes: int | None
     timezone: str
     enabled: bool
     next_run_at: datetime | None

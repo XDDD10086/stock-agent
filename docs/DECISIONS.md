@@ -531,3 +531,61 @@
   - `committee_chain`
   - `committee_result`
 - Streamlit result panel now prioritizes committee output while retaining legacy structured/raw views.
+
+## D-024 Committee Report-Mode Output Policy
+
+- Date: 2026-04-18
+- Status: Accepted
+
+### Decision
+
+- Upgrade committee finalizer output from short action list to report-mode structure.
+- Keep concise fields for quick UI scanning:
+  - `committee_summary`
+  - `committee_actions`
+- Add full report fields for execution-grade review:
+  - `committee_report_json`
+  - `committee_report_markdown`
+- Finalizer prompt must enforce:
+  - no fabricated numbers
+  - explicit "材料未提供，暂无法确认" when evidence is missing
+  - 5-trading-day action framework with trigger conditions.
+
+### Rationale
+
+- Summary-only committee output was too compressed for real execution follow-through.
+- Operators need one-screen visibility of both strategy narrative and structured evidence.
+- Report-mode schema supports downstream rendering and auditability without losing compatibility.
+
+### Consequences
+
+- `committee_result` artifact now includes both JSON report object and rendered markdown.
+- Frontend prioritizes complete committee report rendering while preserving legacy/raw panels.
+- Live GPT-5.4 committee finalizer prompt now targets report-grade JSON contract.
+
+## D-025 Scheduler Trigger Expansion Policy (`one-off` + `interval`)
+
+- Date: 2026-04-18
+- Status: Accepted
+
+### Decision
+
+- Extend schedule trigger matrix with:
+  - `one-off` (alias-compatible with existing `once`)
+  - `interval` (minutes-based recurring trigger)
+- Add `interval_minutes` as schedule contract field across API/storage/scheduler sync.
+- Keep backward compatibility:
+  - existing `once` payloads remain valid.
+
+### Rationale
+
+- Users need explicit one-off naming and interval-based recurrence without writing cron.
+- Minutes interval supports operational polling/research tasks that are awkward in cron for MVP users.
+
+### Consequences
+
+- Schedule schema/service/router now handle:
+  - `trigger_type=one-off` with `run_at_local + timezone`
+  - `trigger_type=interval` with `interval_minutes`
+- APScheduler integration now builds `IntervalTrigger` for interval schedules.
+- SQLite compat migration auto-adds `schedules.interval_minutes` for legacy DBs.
