@@ -452,3 +452,25 @@
 
 - Runs can still complete when upstream model providers reject requests.
 - Operators can identify fallback immediately from frontend result panel.
+
+## D-021 Long-Run Request and Send-Ready Completion Policy
+
+- Date: 2026-04-18
+- Status: Accepted
+
+### Decision
+
+- Frontend API request timeout for long-running execution endpoints is configurable and defaults to 30 minutes.
+- ValueCell completion requires both:
+  - final-response content signal
+  - input bar restored to send-ready state (paper-plane), not stop-square state
+
+### Rationale
+
+- ValueCell research runs can take several minutes; short client timeouts create false failure perception.
+- Content-only completion checks can still capture intermediate progress text.
+
+### Consequences
+
+- Streamlit `Run Task` and `Run Once` calls now use long timeout (`API_RUN_TIMEOUT_SECONDS`).
+- Runner waits until send control is ready before treating content as final.

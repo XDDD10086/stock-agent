@@ -462,11 +462,22 @@
   - `FinalResult.llm_fallback_reason`
 - Streamlit result panel now warns when fallback is activated.
 
+### Completed Work (Checkpoint 6 - Long Runtime UX + Send-Ready Gate)
+
+- Added configurable long request timeout for Streamlit long-running actions:
+  - `API_RUN_TIMEOUT_SECONDS` (default 1800)
+- Updated Run/Result and Schedule Run-Once frontend calls to use long timeout.
+- Hardened ValueCell completion gating:
+  - final content must be present
+  - input action must return to send-ready state (paper-plane), not stop-square
+
 ### Verification Evidence
 
 - Command: `.venv/bin/python -m pytest tests/test_valuecell_runner_contract.py tests/test_tasks_api.py tests/test_schedules_api.py -q`
 - Result: `16 passed`
 - Command: `.venv/bin/python -m pytest tests/test_valuecell_heuristics.py tests/test_valuecell_wait_logic.py tests/test_tasks_api.py tests/test_schedules_api.py tests/test_valuecell_runner_contract.py -q`
 - Result: `23 passed`
+- Command: `.venv/bin/python -m pytest tests/test_valuecell_wait_logic.py tests/test_valuecell_heuristics.py tests/test_tasks_api.py -q`
+- Result: `16 passed`
 - Command: `.venv/bin/python -m pytest -q`
-- Result: `38 passed`
+- Result: `39 passed`

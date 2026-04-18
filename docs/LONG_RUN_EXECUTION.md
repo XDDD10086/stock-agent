@@ -52,6 +52,7 @@
 - M6 checkpoint 3 complete: scheduler trigger matrix (`once/cron/daily/weekly`) + patch/run-once APIs + sqlite compat migration.
 - M6 checkpoint 4 complete: llm-mode visibility + stricter ValueCell completion heuristics to prevent premature capture.
 - M6 checkpoint 5 complete: live-provider failure fallback to deterministic with explicit diagnostics (no user-facing 500).
+- M6 checkpoint 6 complete: frontend long-run timeout + send-ready completion gate to avoid premature scrape.
 - Next focus: optional post-MVP refinements (async worker model, richer parser schema, CI matrix).
 
 ## Active Long Task Plan
@@ -66,6 +67,7 @@
 8. [x] Implement M6 pipeline hardening and scheduler expansion with full regression tests.
 9. [x] Fix post-acceptance issues: enforce visible LLM mode and block intermediate-response false positives.
 10. [x] Add runtime fallback guard for live-LLM quota/provider errors.
+11. [x] Align long-running UX timeout and ValueCell send-ready completion signal.
 
 ## Definition of Progress
 

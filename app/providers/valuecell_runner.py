@@ -382,13 +382,7 @@ class PlaywrightCdpAdapter:
         else:
             raise RuntimeError("Unable to locate chat input element")
 
-        submit_selectors = [
-            "button[aria-label='Send message']",
-            "button[aria-label*='发送']",
-            "button[type='submit']",
-            "button:has-text('发送')",
-            "button:has-text('Send')",
-        ]
+        submit_selectors = self._send_button_selectors()
         for selector in submit_selectors:
             locator = page.locator(selector).first
             if locator.count() > 0 and locator.is_enabled():
@@ -421,14 +415,16 @@ class PlaywrightCdpAdapter:
             if not candidate:
                 page.wait_for_timeout(poll_ms)
                 continue
+            send_ready = self._is_send_button_ready()
 
             if candidate == last_candidate:
                 stable_polls += 1
             else:
                 stable_polls = 0
 
-            # Require richer completion than intermediate progress hints.
-            if is_final_response_candidate(candidate):
+            # Require richer completion than intermediate progress hints, and
+            # ensure input bar has returned to send state (paper-plane ready).
+            if is_final_response_candidate(candidate) and send_ready:
                 # ValueCell marker path can return slightly earlier once content stabilizes.
                 if "已完成任务" in candidate and stable_polls >= 1:
                     return
@@ -445,6 +441,8 @@ class PlaywrightCdpAdapter:
         self._require_page().screenshot(path=output_path, full_page=True)
 
     def capture_latest_response_text(self) -> str:
+        if not self._is_send_button_ready():
+            return ""
         text = self._extract_latest_assistant_text()
         if is_intermediate_progress(text):
             return ""
@@ -470,6 +468,45 @@ class PlaywrightCdpAdapter:
             return ""
         ranked = sorted(candidates, key=response_quality_score, reverse=True)
         return _normalize_text(ranked[0])
+
+    def _is_send_button_ready(self) -> bool:
+        has_send = self._has_interactable_control(self._send_button_selectors())
+        if not has_send:
+            return False
+        has_stop = self._has_interactable_control(self._stop_button_selectors())
+        return not has_stop
+
+    def _has_interactable_control(self, selectors: list[str]) -> bool:
+        page = self._require_page()
+        for selector in selectors:
+            locator = page.locator(selector).first
+            if locator.count() == 0:
+                continue
+            try:
+                if locator.is_visible() and locator.is_enabled():
+                    return True
+            except Exception:
+                continue
+        return False
+
+    def _send_button_selectors(self) -> list[str]:
+        return [
+            "button[aria-label='Send message']",
+            "button[aria-label*='send']",
+            "button[aria-label*='发送']",
+            "button[type='submit']",
+            "button:has-text('发送')",
+            "button:has-text('Send')",
+        ]
+
+    def _stop_button_selectors(self) -> list[str]:
+        return [
+            "button[aria-label*='Stop']",
+            "button[aria-label*='stop']",
+            "button[aria-label*='停止']",
+            "button:has-text('Stop')",
+            "button:has-text('停止')",
+        ]
 
     def _extract_assistant_text_candidates(self) -> list[str]:
         page = self._require_page()

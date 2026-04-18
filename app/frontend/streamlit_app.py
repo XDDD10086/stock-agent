@@ -9,28 +9,30 @@ import streamlit as st
 
 
 API_BASE = os.getenv("API_BASE_URL", "http://127.0.0.1:8000")
+API_TIMEOUT_SECONDS = int(os.getenv("API_TIMEOUT_SECONDS", "90"))
+API_RUN_TIMEOUT_SECONDS = int(os.getenv("API_RUN_TIMEOUT_SECONDS", "1800"))
 
 
-def _post(path: str, payload: dict | None = None) -> dict:
-    response = requests.post(f"{API_BASE}{path}", json=payload, timeout=90)
+def _post(path: str, payload: dict | None = None, *, timeout: int | None = None) -> dict:
+    response = requests.post(f"{API_BASE}{path}", json=payload, timeout=timeout or API_TIMEOUT_SECONDS)
     response.raise_for_status()
     return response.json()
 
 
 def _get(path: str) -> dict:
-    response = requests.get(f"{API_BASE}{path}", timeout=90)
+    response = requests.get(f"{API_BASE}{path}", timeout=API_TIMEOUT_SECONDS)
     response.raise_for_status()
     return response.json()
 
 
 def _delete(path: str) -> dict:
-    response = requests.delete(f"{API_BASE}{path}", timeout=90)
+    response = requests.delete(f"{API_BASE}{path}", timeout=API_TIMEOUT_SECONDS)
     response.raise_for_status()
     return response.json()
 
 
 def _patch(path: str, payload: dict | None = None) -> dict:
-    response = requests.patch(f"{API_BASE}{path}", json=payload, timeout=90)
+    response = requests.patch(f"{API_BASE}{path}", json=payload, timeout=API_TIMEOUT_SECONDS)
     response.raise_for_status()
     return response.json()
 
@@ -203,7 +205,10 @@ def _render_task_tab() -> None:
     col_run, col_fetch = st.columns(2)
     with col_run:
         if st.button("Run Task", use_container_width=True):
-            payload = _call("Run task", lambda: _post(f"/tasks/{run_task_id}/run"))
+            payload = _call(
+                "Run task",
+                lambda: _post(f"/tasks/{run_task_id}/run", timeout=API_RUN_TIMEOUT_SECONDS),
+            )
             if payload:
                 st.success(f"Run status: {payload['status']}")
                 _render_final_result(payload)
@@ -299,7 +304,10 @@ def _render_schedule_tab() -> None:
                 st.json(payload)
     with p4:
         if st.button("Run Once Now", use_container_width=True):
-            payload = _call("Run schedule once", lambda: _post(f"/schedules/{schedule_id}/run-once"))
+            payload = _call(
+                "Run schedule once",
+                lambda: _post(f"/schedules/{schedule_id}/run-once", timeout=API_RUN_TIMEOUT_SECONDS),
+            )
             if payload:
                 _render_final_result(payload)
 
