@@ -13,6 +13,7 @@
 - [x] M3 ValueCell runner live attach validation
 - [x] M4 Scheduler live cron verification
 - [x] M5 Final stabilization and release hardening
+- [x] M6 Prompt gate hardening + ValueCell roundtrip + scheduler matrix
 
 ## Parallelization Policy
 
@@ -46,6 +47,9 @@
 - M5 checkpoint 8 complete: parser quality hardened for bilingual output and UI-noise-heavy raw text.
 - M5 checkpoint 9 complete: pytest warning hygiene cleanup (clean `31 passed` output).
 - M5 checkpoint 10 complete: MVP handoff automation scripts + one-command smoke validation.
+- M6 checkpoint 1 complete: review-gated prompt revision (`revised_once`) + prompt-chain artifact audit trail.
+- M6 checkpoint 2 complete: ValueCell raw assistant response roundtrip to API + frontend dual-panel rendering.
+- M6 checkpoint 3 complete: scheduler trigger matrix (`once/cron/daily/weekly`) + patch/run-once APIs + sqlite compat migration.
 - Next focus: optional post-MVP refinements (async worker model, richer parser schema, CI matrix).
 
 ## Active Long Task Plan
@@ -57,6 +61,7 @@
 5. [x] Add orchestration telemetry artifacts and parser hardening for M5 quality.
 6. [x] Remove noisy third-party warning output in local test runs.
 7. [x] Add one-command startup/smoke scripts for MVP handoff.
+8. [x] Implement M6 pipeline hardening and scheduler expansion with full regression tests.
 
 ## Definition of Progress
 
