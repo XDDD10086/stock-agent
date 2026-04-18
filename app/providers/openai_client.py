@@ -33,6 +33,22 @@ class OpenAIClient:
             system_prompt_path=os.getenv("FINALIZER_PROMPT_PATH", "app/prompts/finalizer_system.md"),
         )
 
+    @classmethod
+    def for_committee_drafter(cls) -> "OpenAIClient":
+        return cls(
+            model=os.getenv("OPENAI_MODEL_COMMITTEE_DRAFTER", "gpt-5.4"),
+            api_key=os.getenv("OPENAI_API_KEY"),
+            system_prompt_path=os.getenv("COMMITTEE_DRAFT_PROMPT_PATH", "app/prompts/committee_draft_system.md"),
+        )
+
+    @classmethod
+    def for_committee_finalizer(cls) -> "OpenAIClient":
+        return cls(
+            model=os.getenv("OPENAI_MODEL_COMMITTEE_FINALIZER", "gpt-5.4"),
+            api_key=os.getenv("OPENAI_API_KEY"),
+            system_prompt_path=os.getenv("COMMITTEE_FINALIZE_PROMPT_PATH", "app/prompts/committee_finalize_system.md"),
+        )
+
     def plan(self, task_input: str) -> dict:
         return self._generate_json(user_input=task_input)
 
@@ -40,6 +56,17 @@ class OpenAIClient:
         payload = {
             "plan": plan,
             "review": review,
+        }
+        return self._generate_json(user_input=json.dumps(payload, ensure_ascii=False))
+
+    def committee_draft(self, context: dict) -> dict:
+        return self._generate_json(user_input=json.dumps(context, ensure_ascii=False))
+
+    def committee_finalize(self, draft: dict, review: dict, context: dict) -> dict:
+        payload = {
+            "draft": draft,
+            "review": review,
+            "context": context,
         }
         return self._generate_json(user_input=json.dumps(payload, ensure_ascii=False))
 

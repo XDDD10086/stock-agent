@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class FinalResult(BaseModel):
@@ -16,5 +16,9 @@ class FinalResult(BaseModel):
     prompt_chain_status: str = "direct_pass"
     llm_mode: str = "deterministic"
     llm_fallback_reason: str | None = None
+    committee_status: str = "skipped_not_completed"
+    committee_summary: str | None = None
+    committee_actions: list[dict] = Field(default_factory=list)
+    committee_fallback_reason: str | None = None
     failed_step: str | None = None
     error_message: str | None = None

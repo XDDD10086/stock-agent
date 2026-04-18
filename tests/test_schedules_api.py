@@ -168,6 +168,7 @@ def test_run_once_endpoint_executes_and_returns_final_result():
     assert payload["status"] == "completed"
     assert payload["valuecell_raw_response"]
     assert payload["prompt_chain_status"] in {"direct_pass", "revised_once"}
+    assert payload["committee_status"] in {"completed", "fallback"}
 
 
 def test_once_schedule_rejects_past_local_time():

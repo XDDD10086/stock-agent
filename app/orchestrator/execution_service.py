@@ -5,6 +5,9 @@ from threading import Lock
 from time import perf_counter
 from typing import Callable
 
+from app.orchestrator.committee_service import CommitteeDraftService
+from app.orchestrator.committee_service import CommitteeFinalizeService
+from app.orchestrator.committee_service import CommitteeReviewService
 from app.orchestrator.finalize_service import FinalizeService
 from app.orchestrator.planner_service import PlannerService
 from app.orchestrator.review_service import ReviewService
@@ -74,6 +77,109 @@ class DeterministicFinalizerClient:
                 {"action": "wait_until_completed"},
             ],
             "timeout_seconds": 900,
+        }
+
+
+class DeterministicCommitteeDrafterClient:
+    def committee_draft(self, context: dict) -> dict:
+        parsed = context.get("parsed_result", {})
+        summary = str(parsed.get("summary") or "").strip()
+        highlights = [str(item).strip() for item in parsed.get("highlights", []) if str(item).strip()]
+        risk_rating = str(parsed.get("risk_rating", "unknown")).strip().lower()
+
+        if not summary:
+            summary = "当前信息显示主要风险与机会并存，建议以分步验证和风险控制为主。"
+
+        actions: list[dict] = []
+        for item in highlights[:4]:
+            actions.append(
+                {
+                    "action": f"优先检查：{item}",
+                    "reason": "该项来自 ValueCell 的关键信号，需先确认其持续性和可验证性。",
+                }
+            )
+        if not actions:
+            actions = [
+                {
+                    "action": "先缩小观察范围到未来 5 个交易日的关键催化事件",
+                    "reason": "先聚焦短期可验证因素，可以降低决策噪声。",
+                },
+                {
+                    "action": "为仓位与回撤设置明确阈值，再决定是否调整风险暴露",
+                    "reason": "有阈值的策略更易执行，也能避免情绪化操作。",
+                },
+            ]
+
+        risks = [f"当前综合风险评级：{risk_rating}"] if risk_rating and risk_rating != "unknown" else []
+        return {
+            "summary": summary,
+            "actions": actions,
+            "risks": risks,
+        }
+
+
+class DeterministicCommitteeReviewerClient:
+    def committee_review(self, draft: dict, context: dict) -> dict:
+        actions = draft.get("actions") or []
+        if len(actions) < 2:
+            return {
+                "approved": False,
+                "issues": ["action count is too low for a practical strategy summary"],
+                "suggested_changes": ["add at least two actionable steps with explicit reasons"],
+                "safety_notes": ["do not present directional certainty when evidence is sparse"],
+            }
+        return {
+            "approved": True,
+            "issues": [],
+            "suggested_changes": [],
+            "safety_notes": ["treat this as research support and validate with your own risk limits"],
+        }
+
+
+class DeterministicCommitteeFinalizerClient:
+    def committee_finalize(self, draft: dict, review: dict, context: dict) -> dict:
+        summary = str(draft.get("summary") or "").strip()
+        actions = list(draft.get("actions") or [])
+        parsed = context.get("parsed_result", {})
+        risk_rating = str(parsed.get("risk_rating", "unknown")).strip().lower()
+
+        if review.get("suggested_changes"):
+            suggestion = str(review["suggested_changes"][0]).strip()
+            actions.append(
+                {
+                    "action": f"补充校验：{suggestion}",
+                    "reason": "审查环节建议补充该项，以提升策略完整性和可执行性。",
+                }
+            )
+
+        if risk_rating and risk_rating != "unknown":
+            suffix = f"当前风险评级为 {risk_rating}，建议小步执行并持续复盘。"
+            summary = f"{summary} {suffix}".strip()
+
+        deduped_actions: list[dict] = []
+        seen: set[str] = set()
+        for item in actions:
+            action = str(item.get("action", "")).strip()
+            reason = str(item.get("reason", "")).strip()
+            if not action or not reason:
+                continue
+            key = f"{action}|{reason}"
+            if key in seen:
+                continue
+            seen.add(key)
+            deduped_actions.append({"action": action, "reason": reason})
+
+        if not deduped_actions:
+            deduped_actions.append(
+                {
+                    "action": "先保持观察并等待下一批可验证数据",
+                    "reason": "当前可执行证据不足，贸然调整可能放大噪声风险。",
+                }
+            )
+
+        return {
+            "committee_summary": summary or "已完成二次提炼，建议按风险可控原则分步执行。",
+            "committee_actions": deduped_actions[:5],
         }
 
 
@@ -182,6 +288,15 @@ class ExecutionService:
                 "raw_text_path": outcome.raw_text_path,
             },
         )
+        committee_chain, committee_result_payload = self._run_committee_chain(
+            task_id=task_id,
+            task_input=task_input,
+            final_result=final_result,
+            prompt_chain_status=review_gate_status,
+            llm_mode=llm_mode,
+        )
+        self._task_service.save_artifact(task_id, "committee_chain", committee_chain)
+        self._task_service.save_artifact(task_id, "committee_result", committee_result_payload)
 
         self._task_service.save_artifact(task_id, "final_result", final_result.model_dump())
         ended_at = datetime.now(UTC)
@@ -201,6 +316,87 @@ class ExecutionService:
         )
         self._task_service.update_status(task_id, final_result.status)
         return final_result
+
+    def _run_committee_chain(
+        self,
+        *,
+        task_id: str,
+        task_input: str,
+        final_result: FinalResult,
+        prompt_chain_status: str,
+        llm_mode: str,
+    ) -> tuple[dict, dict]:
+        context = {
+            "task_input": task_input,
+            "task_id": task_id,
+            "prompt_chain_status": prompt_chain_status,
+            "parsed_result": {
+                "summary": final_result.summary,
+                "highlights": final_result.highlights,
+                "table": final_result.table,
+                "risk_rating": final_result.risk_rating,
+            },
+            "valuecell_raw_response": final_result.valuecell_raw_response or "",
+        }
+
+        if final_result.status != "completed":
+            final_result.committee_status = "skipped_not_completed"
+            final_result.committee_summary = None
+            final_result.committee_actions = []
+            final_result.committee_fallback_reason = None
+            skipped_payload = {
+                "status": "skipped_not_completed",
+                "reason": f"task status is {final_result.status}",
+                "captured_at_utc": datetime.now(UTC).isoformat(),
+            }
+            return skipped_payload, {
+                "committee_status": final_result.committee_status,
+                "committee_summary": final_result.committee_summary,
+                "committee_actions": final_result.committee_actions,
+                "committee_fallback_reason": final_result.committee_fallback_reason,
+            }
+
+        drafter, reviewer, finalizer = build_committee_clients_from_env(llm_mode=llm_mode)
+        try:
+            draft_model = CommitteeDraftService(drafter).build_draft(context)
+            review_model = CommitteeReviewService(reviewer).review_draft(draft_model, context)
+            final_model = CommitteeFinalizeService(finalizer).finalize(draft_model, review_model, context)
+
+            final_result.committee_status = "completed"
+            final_result.committee_summary = final_model.committee_summary
+            final_result.committee_actions = [item.model_dump() for item in final_model.committee_actions]
+            final_result.committee_fallback_reason = None
+
+            chain_payload = {
+                "status": "completed",
+                "context": context,
+                "draft": draft_model.model_dump(),
+                "review": review_model.model_dump(),
+                "final": final_model.model_dump(),
+                "captured_at_utc": datetime.now(UTC).isoformat(),
+            }
+        except Exception as exc:
+            final_result.committee_status = "fallback"
+            final_result.committee_summary = None
+            final_result.committee_actions = []
+            final_result.committee_fallback_reason = f"{type(exc).__name__}: {exc}"
+
+            chain_payload = {
+                "status": "fallback",
+                "context": context,
+                "error_type": type(exc).__name__,
+                "error_message": str(exc),
+                "captured_at_utc": datetime.now(UTC).isoformat(),
+            }
+
+        result_payload = {
+            "committee_status": final_result.committee_status,
+            "committee_summary": final_result.committee_summary,
+            "committee_actions": final_result.committee_actions,
+            "committee_fallback_reason": final_result.committee_fallback_reason,
+            "captured_at_utc": datetime.now(UTC).isoformat(),
+        }
+        return chain_payload, result_payload
 
     def _run_llm_chain(
         self,
@@ -265,6 +461,21 @@ def build_llm_clients_from_env():
     if use_live:
         return OpenAIClient.for_planner(), GeminiClient.for_reviewer(), OpenAIClient.for_finalizer()
     return DeterministicPlannerClient(), DeterministicReviewerClient(), DeterministicFinalizerClient()
+
+
+def build_committee_clients_from_env(*, llm_mode: str):
+    use_live = llm_mode == "live"
+    if use_live:
+        return (
+            OpenAIClient.for_committee_drafter(),
+            GeminiClient.for_committee_reviewer(),
+            OpenAIClient.for_committee_finalizer(),
+        )
+    return (
+        DeterministicCommitteeDrafterClient(),
+        DeterministicCommitteeReviewerClient(),
+        DeterministicCommitteeFinalizerClient(),
+    )
 
 
 def resolve_llm_mode_from_env() -> str:

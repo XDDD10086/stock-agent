@@ -63,6 +63,26 @@ def test_openai_finalizer_serializes_payload_as_json(monkeypatch, tmp_path):
     assert parsed["review"] == {"b": 2}
 
 
+def test_openai_committee_finalize_serializes_payload_as_json(monkeypatch, tmp_path):
+    prompt_file = tmp_path / "committee_finalize.md"
+    prompt_file.write_text("committee finalize prompt", encoding="utf-8")
+    monkeypatch.setattr("app.providers.openai_client.OpenAI", _FakeOpenAI)
+    client = OpenAIClient(model="fake-model", api_key="k", system_prompt_path=str(prompt_file))
+
+    result = client.committee_finalize(
+        {"summary": "draft"},
+        {"approved": True, "issues": []},
+        {"task_input": "scan portfolio"},
+    )
+
+    assert result["ok"] is True
+    user_payload = client._client.last_request["input"][1]["content"]
+    parsed = json.loads(user_payload)
+    assert parsed["draft"] == {"summary": "draft"}
+    assert parsed["review"] == {"approved": True, "issues": []}
+    assert parsed["context"] == {"task_input": "scan portfolio"}
+
+
 def test_gemini_reviewer_serializes_plan_as_json(monkeypatch, tmp_path):
     prompt_file = tmp_path / "reviewer.md"
     prompt_file.write_text("review prompt", encoding="utf-8")
@@ -74,3 +94,16 @@ def test_gemini_reviewer_serializes_plan_as_json(monkeypatch, tmp_path):
     assert result["ok"] is True
     assert '"ticker": "AAPL"' in client._client.last_contents
     assert "'ticker': 'AAPL'" not in client._client.last_contents
+
+
+def test_gemini_committee_reviewer_serializes_payload(monkeypatch, tmp_path):
+    prompt_file = tmp_path / "committee_review.md"
+    prompt_file.write_text("committee review prompt", encoding="utf-8")
+    monkeypatch.setattr("app.providers.gemini_client.genai.Client", _FakeGeminiClient)
+    client = GeminiClient(model="fake-model", api_key="k", system_prompt_path=str(prompt_file))
+
+    result = client.committee_review({"summary": "draft"}, {"task_input": "AAPL analysis"})
+
+    assert result["ok"] is True
+    assert '"summary": "draft"' in client._client.last_contents
+    assert '"task_input": "AAPL analysis"' in client._client.last_contents

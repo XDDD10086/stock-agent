@@ -44,6 +44,11 @@ class FakeBrowserAdapter:
         return None
 
 
+class FailingBrowserAdapter(FakeBrowserAdapter):
+    def submit_prompt(self, prompt: str) -> None:
+        raise RuntimeError("submit_prompt failed")
+
+
 class RevisionPlannerClient:
     def plan(self, task_input: str) -> dict:
         return {
@@ -88,10 +93,17 @@ class FailingLivePlannerClient:
         raise RuntimeError("insufficient_quota")
 
 
-def _client(db_url: str | None = None) -> TestClient:
+class FailingCommitteeDrafterClient:
+    def committee_draft(self, context: dict) -> dict:
+        raise RuntimeError("committee draft unavailable")
+
+
+def _client(db_url: str | None = None, *, adapter_factory=None) -> TestClient:
     if db_url is None:
         db_url = f"sqlite:///./data/test_app_{uuid4().hex}.db"
-    app = create_app(db_url=db_url, adapter_factory=lambda: FakeBrowserAdapter())
+    if adapter_factory is None:
+        adapter_factory = lambda: FakeBrowserAdapter()
+    app = create_app(db_url=db_url, adapter_factory=adapter_factory)
     return TestClient(app)
 
 
@@ -157,6 +169,10 @@ def test_run_and_result_endpoints():
     assert run_payload["valuecell_raw_response"]
     assert run_payload["prompt_chain_status"] == "direct_pass"
     assert run_payload["llm_mode"] == "deterministic"
+    assert run_payload["committee_status"] == "completed"
+    assert run_payload["committee_summary"]
+    assert run_payload["committee_actions"]
+    assert run_payload["committee_fallback_reason"] is None
 
     result_response = client.get(f"/tasks/{created['task_id']}/result")
     assert result_response.status_code == 200
@@ -167,6 +183,9 @@ def test_run_and_result_endpoints():
     assert result_payload["valuecell_raw_response"]
     assert result_payload["prompt_chain_status"] == "direct_pass"
     assert result_payload["llm_mode"] == "deterministic"
+    assert result_payload["committee_status"] == "completed"
+    assert result_payload["committee_summary"]
+    assert result_payload["committee_actions"]
 
     artifacts_response = client.get(f"/tasks/{created['task_id']}/artifacts")
     assert artifacts_response.status_code == 200
@@ -178,6 +197,8 @@ def test_run_and_result_endpoints():
     assert "runner_diagnostics" in artifact_types
     assert "valuecell_raw_response" in artifact_types
     assert "orchestration_metrics" in artifact_types
+    assert "committee_chain" in artifact_types
+    assert "committee_result" in artifact_types
     assert "final_result" in artifact_types
 
     plan_artifact = client.get(f"/tasks/{created['task_id']}/artifacts/plan_v1")
@@ -202,6 +223,16 @@ def test_run_and_result_endpoints():
     metrics = orchestration_artifact.json()["payload"]
     assert metrics["total_seconds"] >= 0
     assert metrics["runner_seconds"] >= 0
+
+    committee_chain = client.get(f"/tasks/{created['task_id']}/artifacts/committee_chain")
+    assert committee_chain.status_code == 200
+    assert committee_chain.json()["payload"]["status"] == "completed"
+    assert committee_chain.json()["payload"]["draft"]["summary"]
+
+    committee_result = client.get(f"/tasks/{created['task_id']}/artifacts/committee_result")
+    assert committee_result.status_code == 200
+    assert committee_result.json()["payload"]["committee_status"] == "completed"
+    assert committee_result.json()["payload"]["committee_actions"]
 
 
 def test_run_endpoint_returns_409_when_runner_busy():
@@ -269,3 +300,39 @@ def test_live_llm_failure_falls_back_to_deterministic(monkeypatch):
     llm_live_error = client.get(f"/tasks/{created['task_id']}/artifacts/llm_live_error")
     assert llm_live_error.status_code == 200
     assert llm_live_error.json()["payload"]["error_type"] == "RuntimeError"
+
+
+def test_committee_failure_degrades_to_fallback_without_failing_task(monkeypatch):
+    monkeypatch.setattr(
+        "app.orchestrator.execution_service.build_committee_clients_from_env",
+        lambda llm_mode: (FailingCommitteeDrafterClient(), RevisionReviewerClient(), RevisionFinalizerClient()),
+    )
+    client = _client()
+    created = client.post("/tasks", json={"input": "committee fallback check"}).json()
+
+    run_response = client.post(f"/tasks/{created['task_id']}/run")
+    assert run_response.status_code == 200
+    payload = run_response.json()
+    assert payload["status"] == "completed"
+    assert payload["committee_status"] == "fallback"
+    assert payload["committee_fallback_reason"]
+    assert payload["summary"]
+
+    committee_result = client.get(f"/tasks/{created['task_id']}/artifacts/committee_result")
+    assert committee_result.status_code == 200
+    committee_payload = committee_result.json()["payload"]
+    assert committee_payload["committee_status"] == "fallback"
+    assert committee_payload["committee_fallback_reason"]
+
+
+def test_committee_skips_when_run_needs_manual_intervention():
+    client = _client(adapter_factory=lambda: FailingBrowserAdapter())
+    created = client.post("/tasks", json={"input": "manual path"}).json()
+
+    run_response = client.post(f"/tasks/{created['task_id']}/run")
+    assert run_response.status_code == 200
+    payload = run_response.json()
+    assert payload["status"] == "needs_manual_intervention"
+    assert payload["committee_status"] == "skipped_not_completed"
+    assert payload["committee_actions"] == []
+    assert payload["committee_summary"] is None
