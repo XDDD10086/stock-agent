@@ -497,3 +497,37 @@
 - `wait_until_completed` now gates on `completion_ui_ready` instead of strict enabled-send-only checks.
 - `capture_latest_response_text` uses the same completion signal for consistency.
 - Completion markers (`已完成任务/执行摘要/风险评级`) can now override "thinking label" noise (`思考过程`) inside the same final block.
+
+## D-023 Post-ValueCell Committee Summarization Chain
+
+- Date: 2026-04-18
+- Status: Accepted
+
+### Decision
+
+- Add a second-stage committee chain after ValueCell completion:
+  - GPT-5.4 draft (`committee_draft`)
+  - Gemini 3.1 Pro review (`committee_review`)
+  - GPT-5.4 finalize (`committee_finalize`)
+- Return committee results to frontend as primary readable output:
+  - `committee_summary`
+  - `committee_actions` (action + reason)
+- Keep ValueCell raw response and structured parse for traceability.
+- If committee stage fails, degrade gracefully:
+  - keep task `completed`
+  - set `committee_status=fallback`
+  - expose `committee_fallback_reason`
+
+### Rationale
+
+- Users need concise, actionable strategy guidance rather than only raw research output.
+- A committee review loop improves readability and consistency while preserving safety constraints.
+- Committee errors should not block already completed ValueCell runs.
+
+### Consequences
+
+- `FinalResult` now includes committee fields and status.
+- New artifacts:
+  - `committee_chain`
+  - `committee_result`
+- Streamlit result panel now prioritizes committee output while retaining legacy structured/raw views.

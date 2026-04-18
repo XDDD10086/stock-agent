@@ -490,6 +490,27 @@
 - Updated final-candidate heuristics to prioritize completion markers over mixed-label noise.
 - Verified on live attached ValueCell page: completion wait returns immediately when final block is already complete.
 
+### Completed Work (Checkpoint 9 - M7 Committee Summarization Chain)
+
+- Added post-ValueCell committee chain:
+  - GPT-5.4 draft
+  - Gemini 3.1 Pro review
+  - GPT-5.4 finalize
+- Extended final API payload with committee fields:
+  - `committee_status`
+  - `committee_summary`
+  - `committee_actions`
+  - `committee_fallback_reason`
+- Added graceful degradation policy for committee errors:
+  - task remains `completed`
+  - committee status returns `fallback` with explicit reason
+- Added skip policy for non-completed runs:
+  - `committee_status=skipped_not_completed`
+- Streamlit result panel upgraded:
+  - committee output displayed first
+  - legacy structured result and raw ValueCell content remain expandable
+- Smoke validation upgraded to require `committee_chain` and `committee_result` artifacts.
+
 ### Verification Evidence
 
 - Command: `.venv/bin/python -m pytest tests/test_valuecell_runner_contract.py tests/test_tasks_api.py tests/test_schedules_api.py -q`
@@ -504,3 +525,7 @@
 - Result: `41 passed`
 - Command: `.venv/bin/python -m pytest -q`
 - Result: `42 passed`
+- Command: `.venv/bin/python -m pytest -q`
+- Result: `47 passed`
+- Command: `./scripts/smoke_mvp.sh --skip-schedule-check --allow-manual-intervention` (API running, CDP attached)
+- Result: all PASS checkpoints including committee artifact presence

@@ -55,6 +55,7 @@
 - M6 checkpoint 6 complete: frontend long-run timeout + send-ready completion gate to avoid premature scrape.
 - M6 checkpoint 7 complete: completion detection now accepts reply action-bar (`复制/保存/详情`) and disabled paper-plane visibility.
 - M6 checkpoint 8 complete: mixed final text with `思考过程` labels no longer blocks completion when final markers are present.
+- M7 checkpoint 1 complete: post-ValueCell committee chain (GPT draft -> Gemini review -> GPT finalize) with fallback-safe output.
 - Next focus: optional post-MVP refinements (async worker model, richer parser schema, CI matrix).
 
 ## Active Long Task Plan
@@ -72,6 +73,7 @@
 11. [x] Align long-running UX timeout and ValueCell send-ready completion signal.
 12. [x] Add completion action-bar signal and visible-send fallback for ValueCell finished-state detection.
 13. [x] Allow completion markers to override noisy thinking labels in final response blocks.
+14. [x] Add committee summarization chain and committee-first frontend presentation.
 
 ## Definition of Progress
 
