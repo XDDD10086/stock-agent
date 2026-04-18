@@ -474,3 +474,25 @@
 
 - Streamlit `Run Task` and `Run Once` calls now use long timeout (`API_RUN_TIMEOUT_SECONDS`).
 - Runner waits until send control is ready before treating content as final.
+
+## D-022 Completion Action-Bar Signal for ValueCell
+
+- Date: 2026-04-18
+- Status: Accepted
+
+### Decision
+
+- Treat ValueCell answer as completion-ready when either condition is satisfied:
+  - input control returned to send state (no stop control visible)
+  - latest assistant reply exposes post-answer actions (`复制/保存/详情` or `Copy/Save/Details`)
+- Send-state detection is based on control visibility (not enabled state), because paper-plane can be visible but disabled when input is empty.
+
+### Rationale
+
+- In real sessions, users observe completion by action bar + paper-plane restoration.
+- Relying on "enabled send button" alone can miss completed runs and block frontend return.
+
+### Consequences
+
+- `wait_until_completed` now gates on `completion_ui_ready` instead of strict enabled-send-only checks.
+- `capture_latest_response_text` uses the same completion signal for consistency.

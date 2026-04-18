@@ -415,7 +415,7 @@ class PlaywrightCdpAdapter:
             if not candidate:
                 page.wait_for_timeout(poll_ms)
                 continue
-            send_ready = self._is_send_button_ready()
+            completion_ui_ready = self._is_completion_ui_ready()
 
             if candidate == last_candidate:
                 stable_polls += 1
@@ -423,8 +423,9 @@ class PlaywrightCdpAdapter:
                 stable_polls = 0
 
             # Require richer completion than intermediate progress hints, and
-            # ensure input bar has returned to send state (paper-plane ready).
-            if is_final_response_candidate(candidate) and send_ready:
+            # ensure completion UI is visible (paper-plane/send state or
+            # post-answer action bar such as 复制/保存/详情).
+            if is_final_response_candidate(candidate) and completion_ui_ready:
                 # ValueCell marker path can return slightly earlier once content stabilizes.
                 if "已完成任务" in candidate and stable_polls >= 1:
                     return
@@ -441,7 +442,7 @@ class PlaywrightCdpAdapter:
         self._require_page().screenshot(path=output_path, full_page=True)
 
     def capture_latest_response_text(self) -> str:
-        if not self._is_send_button_ready():
+        if not self._is_completion_ui_ready():
             return ""
         text = self._extract_latest_assistant_text()
         if is_intermediate_progress(text):
@@ -469,25 +470,66 @@ class PlaywrightCdpAdapter:
         ranked = sorted(candidates, key=response_quality_score, reverse=True)
         return _normalize_text(ranked[0])
 
+    def _is_completion_ui_ready(self) -> bool:
+        if self._is_send_button_ready():
+            return True
+        return self._has_latest_reply_action_bar()
+
     def _is_send_button_ready(self) -> bool:
-        has_send = self._has_interactable_control(self._send_button_selectors())
+        has_send = self._has_visible_control(self._send_button_selectors())
         if not has_send:
             return False
-        has_stop = self._has_interactable_control(self._stop_button_selectors())
+        has_stop = self._has_visible_control(self._stop_button_selectors())
         return not has_stop
 
-    def _has_interactable_control(self, selectors: list[str]) -> bool:
+    def _has_visible_control(self, selectors: list[str]) -> bool:
         page = self._require_page()
         for selector in selectors:
             locator = page.locator(selector).first
             if locator.count() == 0:
                 continue
             try:
-                if locator.is_visible() and locator.is_enabled():
+                if locator.is_visible():
                     return True
             except Exception:
                 continue
         return False
+
+    def _has_latest_reply_action_bar(self) -> bool:
+        page = self._require_page()
+        result = page.evaluate(
+            """
+            () => {
+                const main = document.querySelector("main.main-chat-area");
+                if (!main) return false;
+
+                const sections = Array.from(main.querySelectorAll(":scope > section"));
+                let lastUserIdx = -1;
+                for (let i = 0; i < sections.length; i += 1) {
+                    const cls = (sections[i].className || "").toString();
+                    if (cls.includes("ml-auto")) lastUserIdx = i;
+                }
+
+                let latestAssistant = null;
+                for (let i = sections.length - 1; i > lastUserIdx; i -= 1) {
+                    const section = sections[i];
+                    const cls = (section.className || "").toString();
+                    if (cls.includes("ml-auto")) continue;
+                    latestAssistant = section;
+                    break;
+                }
+                if (!latestAssistant) return false;
+
+                const text = (latestAssistant.innerText || latestAssistant.textContent || "").toLowerCase();
+                if (!text) return false;
+
+                const zhReady = ["复制", "保存", "详情"].every((token) => text.includes(token));
+                const enReady = ["copy", "save", "details"].every((token) => text.includes(token));
+                return zhReady || enReady;
+            }
+            """
+        )
+        return bool(result)
 
     def _send_button_selectors(self) -> list[str]:
         return [

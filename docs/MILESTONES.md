@@ -471,6 +471,17 @@
   - final content must be present
   - input action must return to send-ready state (paper-plane), not stop-square
 
+### Completed Work (Checkpoint 7 - Completion Action Bar Signal)
+
+- Added ValueCell completion UI fallback signal from latest assistant reply action bar:
+  - Chinese: `复制 / 保存 / 详情`
+  - English: `Copy / Save / Details`
+- Updated completion policy to accept:
+  - send-ready state OR
+  - reply action-bar visible
+- Relaxed send-state detection from `visible+enabled` to `visible` to handle disabled paper-plane after answer is complete.
+- Added wait-loop tests for completion-UI gating and capture-stage gating.
+
 ### Verification Evidence
 
 - Command: `.venv/bin/python -m pytest tests/test_valuecell_runner_contract.py tests/test_tasks_api.py tests/test_schedules_api.py -q`
@@ -481,3 +492,5 @@
 - Result: `16 passed`
 - Command: `.venv/bin/python -m pytest -q`
 - Result: `39 passed`
+- Command: `.venv/bin/python -m pytest -q`
+- Result: `41 passed`

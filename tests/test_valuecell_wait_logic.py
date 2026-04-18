@@ -44,7 +44,7 @@ def test_wait_until_completed_requires_stable_meaningful_response(monkeypatch):
     )
     monkeypatch.setattr("app.providers.valuecell_runner.monotonic", FakeClock(step=0.2))
     monkeypatch.setattr(adapter, "_extract_latest_assistant_text", lambda: next(samples))
-    monkeypatch.setattr(adapter, "_is_send_button_ready", lambda: True)
+    monkeypatch.setattr(adapter, "_is_completion_ui_ready", lambda: True)
 
     adapter.wait_until_completed(timeout_seconds=5, poll_interval_seconds=1)
 
@@ -56,7 +56,7 @@ def test_wait_until_completed_times_out_on_loading_only_text(monkeypatch):
     adapter, _ = _adapter_with_page()
     monkeypatch.setattr("app.providers.valuecell_runner.monotonic", FakeClock(step=0.6))
     monkeypatch.setattr(adapter, "_extract_latest_assistant_text", lambda: "Typing...")
-    monkeypatch.setattr(adapter, "_is_send_button_ready", lambda: True)
+    monkeypatch.setattr(adapter, "_is_completion_ui_ready", lambda: True)
 
     with pytest.raises(RuntimeError, match="Timed out waiting for ValueCell response completion"):
         adapter.wait_until_completed(timeout_seconds=1, poll_interval_seconds=1)
@@ -74,8 +74,35 @@ def test_wait_until_completed_waits_until_send_button_ready(monkeypatch):
     readiness = iter([False, False, True])
     monkeypatch.setattr("app.providers.valuecell_runner.monotonic", FakeClock(step=0.3))
     monkeypatch.setattr(adapter, "_extract_latest_assistant_text", lambda: next(samples))
-    monkeypatch.setattr(adapter, "_is_send_button_ready", lambda: next(readiness))
+    monkeypatch.setattr(adapter, "_is_completion_ui_ready", lambda: next(readiness))
 
     adapter.wait_until_completed(timeout_seconds=3, poll_interval_seconds=1)
 
     assert page.timeout_calls == [1000, 1000]
+
+
+def test_wait_until_completed_accepts_action_bar_when_send_not_ready(monkeypatch):
+    adapter, page = _adapter_with_page()
+    samples = iter(
+        [
+            "执行摘要：趋势稳定。风险评级：黄灯。建议关注成交量变化。",
+            "执行摘要：趋势稳定。风险评级：黄灯。建议关注成交量变化。",
+            "执行摘要：趋势稳定。风险评级：黄灯。建议关注成交量变化。",
+        ]
+    )
+    ui_ready = iter([False, False, True])
+    monkeypatch.setattr("app.providers.valuecell_runner.monotonic", FakeClock(step=0.3))
+    monkeypatch.setattr(adapter, "_extract_latest_assistant_text", lambda: next(samples))
+    monkeypatch.setattr(adapter, "_is_completion_ui_ready", lambda: next(ui_ready))
+
+    adapter.wait_until_completed(timeout_seconds=3, poll_interval_seconds=1)
+
+    assert page.timeout_calls == [1000, 1000]
+
+
+def test_capture_latest_response_text_requires_completion_ui(monkeypatch):
+    adapter, _ = _adapter_with_page()
+    monkeypatch.setattr(adapter, "_extract_latest_assistant_text", lambda: "执行摘要：样例。风险评级：绿灯。")
+    monkeypatch.setattr(adapter, "_is_completion_ui_ready", lambda: False)
+
+    assert adapter.capture_latest_response_text() == ""

@@ -53,6 +53,7 @@
 - M6 checkpoint 4 complete: llm-mode visibility + stricter ValueCell completion heuristics to prevent premature capture.
 - M6 checkpoint 5 complete: live-provider failure fallback to deterministic with explicit diagnostics (no user-facing 500).
 - M6 checkpoint 6 complete: frontend long-run timeout + send-ready completion gate to avoid premature scrape.
+- M6 checkpoint 7 complete: completion detection now accepts reply action-bar (`复制/保存/详情`) and disabled paper-plane visibility.
 - Next focus: optional post-MVP refinements (async worker model, richer parser schema, CI matrix).
 
 ## Active Long Task Plan
@@ -68,6 +69,7 @@
 9. [x] Fix post-acceptance issues: enforce visible LLM mode and block intermediate-response false positives.
 10. [x] Add runtime fallback guard for live-LLM quota/provider errors.
 11. [x] Align long-running UX timeout and ValueCell send-ready completion signal.
+12. [x] Add completion action-bar signal and visible-send fallback for ValueCell finished-state detection.
 
 ## Definition of Progress
 
