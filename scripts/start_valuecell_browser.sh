@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-PROFILE_DIR="${CHROME_USER_DATA_DIR:-/Users/bot/chrome-valuecell-profile}"
+PROFILE_DIR="${CHROME_USER_DATA_DIR:-$HOME/chrome-valuecell-profile}"
 CDP_PORT="${CHROME_CDP_PORT:-9222}"
 
 if [[ -d "/Applications/Google Chrome.app" ]]; then

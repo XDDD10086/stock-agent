@@ -36,7 +36,6 @@ _NOISE_PREFIXES = (
     "research task:",
     "role:",
     "task:",
-    "yizhou liu",
     "valuecell 正在执行任务",
     "理解问题意图",
     "构建分析策略",
