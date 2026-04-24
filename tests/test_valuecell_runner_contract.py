@@ -44,6 +44,11 @@ class FakeAdapter:
         self.connected = False
 
 
+class ExplodingAdapter(FakeAdapter):
+    def connect(self, cdp_url: str) -> None:
+        raise RuntimeError("adapter should not be called in mock pass mode")
+
+
 def test_preflight_requires_attach_existing_mode():
     config = RunnerConfig(
         chat_url="https://valuecell.cn/zh/chat",
@@ -157,3 +162,34 @@ def test_execute_failure_returns_manual_intervention(tmp_path):
     assert "submit_prompt failed" in (outcome.error_message or "")
     assert outcome.duration_seconds is not None
     assert outcome.step_history
+
+
+def test_execute_mock_pass_bypasses_browser_adapter_and_returns_completed(tmp_path):
+    config = RunnerConfig(
+        chat_url="https://valuecell.cn/zh/chat",
+        cdp_url="http://127.0.0.1:9222",
+        execution_mode="attach_existing",
+        failure_policy="manual_intervention",
+        screenshots_dir=str(tmp_path / "shots"),
+        artifacts_dir=str(tmp_path / "artifacts"),
+        mock_mode="pass",
+    )
+    runner = ValueCellRunner(config=config)
+    execution_pack = ExecutionPack(
+        target="valuecell_web",
+        valuecell_prompt="scan pipeline health",
+        expected_sections=["summary", "risk_rating"],
+        browser_steps=[BrowserStep(action="open_chat"), BrowserStep(action="submit")],
+        timeout_seconds=900,
+    )
+
+    outcome = runner.execute(task_id="task_mock", execution_pack=execution_pack, adapter=ExplodingAdapter())
+
+    assert outcome.status == "completed"
+    assert outcome.failed_step is None
+    assert outcome.raw_response_text is not None
+    assert "Risk Rating: Yellow" in outcome.raw_response_text
+    assert outcome.raw_text_path is not None
+    assert outcome.screenshot_path is not None
+    assert outcome.step_history
+    assert outcome.step_history[-1]["step"] == "mock_pass_generate_result"

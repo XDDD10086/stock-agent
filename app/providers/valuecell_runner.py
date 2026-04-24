@@ -18,6 +18,7 @@ class RunnerConfig:
     screenshots_dir: str = "./screenshots"
     artifacts_dir: str = "./artifacts"
     poll_interval_seconds: int = 5
+    mock_mode: str = "off"
 
 
 @dataclass(frozen=True)
@@ -232,6 +233,28 @@ class ValueCellRunner:
                 error_message=reason,
                 screenshot_path=None,
                 raw_text_path=None,
+                started_at_utc=started_at.isoformat(),
+                ended_at_utc=ended_at.isoformat(),
+                duration_seconds=round((ended_at - started_at).total_seconds(), 3),
+                step_history=step_history,
+            )
+
+        if self._config.mock_mode == "pass":
+            mark_step("mock_pass_generate_result")
+            screenshot_path = self._build_screenshot_path(task_id, suffix="mock")
+            raw_text_path = self._build_artifact_path(task_id)
+            raw_response_text = _build_mock_pass_response(execution_pack.valuecell_prompt)
+            Path(screenshot_path).write_bytes(b"PNG")
+            Path(raw_text_path).write_text(raw_response_text, encoding="utf-8")
+            ended_at = datetime.now(UTC)
+            return RunnerOutcome(
+                task_id=task_id,
+                status="completed",
+                failed_step=None,
+                error_message=None,
+                screenshot_path=screenshot_path,
+                raw_text_path=raw_text_path,
+                raw_response_text=raw_response_text,
                 started_at_utc=started_at.isoformat(),
                 ended_at_utc=ended_at.isoformat(),
                 duration_seconds=round((ended_at - started_at).total_seconds(), 3),
@@ -615,3 +638,22 @@ class PlaywrightCdpAdapter:
         if self._page is None:
             raise RuntimeError("Browser adapter is not connected")
         return self._page
+
+
+def _build_mock_pass_response(prompt: str) -> str:
+    prompt_snippet = _normalize_text(prompt)[:80] or "mock task input"
+    return (
+        "Executive Summary:\n"
+        "- Mock mode is enabled for local workflow validation.\n"
+        f"- Prompt snippet: {prompt_snippet}\n"
+        "- ValueCell browser execution is bypassed in this run.\n\n"
+        "Highlights:\n"
+        "- Pipeline connectivity check passed\n"
+        "- Structured parser compatibility check passed\n"
+        "- Delivery contract check passed\n\n"
+        "Risk Rating: Yellow\n\n"
+        "| factor | signal | impact | confidence |\n"
+        "| --- | --- | --- | --- |\n"
+        "| pipeline_status | pass | low | high |\n"
+        "| data_freshness | mock | medium | medium |\n"
+    )

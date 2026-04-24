@@ -14,6 +14,9 @@
 - [x] M4 Scheduler live cron verification
 - [x] M5 Final stabilization and release hardening
 - [x] M6 Prompt gate hardening + ValueCell roundtrip + scheduler matrix
+- [x] M7 Committee report chain + trigger matrix expansion
+- [x] M8 Discord dual-channel control console (analyst/scheduler split)
+- [x] M9 Documentation + deployment/ops hardening + release hygiene
 
 ## Parallelization Policy
 
@@ -58,6 +61,13 @@
 - M7 checkpoint 1 complete: post-ValueCell committee chain (GPT draft -> Gemini review -> GPT finalize) with fallback-safe output.
 - M7 checkpoint 2 complete: committee output upgraded to report-mode (`committee_report_json` + markdown rendering) with stronger finalizer prompt constraints.
 - M7 checkpoint 3 complete: scheduler trigger matrix expanded with `one-off` and `interval(interval_minutes)` plus API test coverage.
+- M8 checkpoint 1 complete: Discord bridge process scaffolded with slash command routing and channel/role authorization policy.
+- M8 checkpoint 2 complete: analyst-result unification delivered for manual `/run` and scheduled runs (poll + dedupe state file).
+- M8 checkpoint 3 complete: schedule trigger metadata (`trigger_meta`) persisted for `run-once` and scheduler callbacks.
+- M8 checkpoint 4 complete: Discord bridge unit/integration coverage added with API-backed fake-adapter validation.
+- M9 checkpoint 1 complete: full README rewrite with architecture/stack/deploy/features/Discord routing coverage.
+- M9 checkpoint 2 complete: added `docs/DEPLOYMENT.md` and `docs/FRONTEND_BACKEND.md` for operations and integration handoff.
+- M9 checkpoint 3 complete: final regression and release hygiene checks (`92 passed`, sensitive-pattern scan clean).
 - Next focus: optional post-MVP refinements (async worker model, richer parser schema, CI matrix).
 
 ## Active Long Task Plan
@@ -78,6 +88,7 @@
 14. [x] Add committee summarization chain and committee-first frontend presentation.
 15. [x] Upgrade committee from summary-actions to report-grade output schema and UI rendering.
 16. [x] Add scheduler `one-off` and `interval` triggers with persistence/scheduler wiring/tests.
+17. [x] Add Discord dual-channel bridge with command split, unified analyst result sink, and delivery dedupe.
 
 ## Definition of Progress
 

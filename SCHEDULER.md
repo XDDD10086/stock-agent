@@ -37,7 +37,8 @@ When runtime is enabled:
 2. Pausing/resuming updates both DB state and scheduler job state.
 3. Deleting removes both DB record and scheduler job.
 4. Triggered job creates a task and runs it through `ExecutionService`.
-5. `run-once` executes immediately without mutating the original schedule trigger definition.
+5. Triggered runs persist `trigger_meta` artifact for downstream consumers (for example Discord bridge result routing).
+6. `run-once` executes immediately without mutating the original schedule trigger definition.
 
 ## Current Limitation
 

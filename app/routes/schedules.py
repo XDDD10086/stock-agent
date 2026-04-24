@@ -43,13 +43,23 @@ def build_schedules_router(
     def _job_id(schedule_id: int) -> str:
         return f"schedule_{schedule_id}"
 
-    def _run_scheduled_task(task_input: str) -> None:
+    def _run_scheduled_task(task_input: str, schedule_id: int, schedule_name: str) -> None:
         if not try_acquire_execution_lock():
             return
         db = session_factory()
         try:
             task_service = TaskService(db)
             task = task_service.create_task(task_input)
+            task_service.save_artifact(
+                task.task_id,
+                "trigger_meta",
+                {
+                    "source": "schedule",
+                    "schedule_id": schedule_id,
+                    "schedule_name": schedule_name,
+                    "triggered_at_utc": datetime.now(UTC).isoformat(),
+                },
+            )
             runner = ValueCellRunner(runner_config)
             ExecutionService(task_service=task_service, runner=runner, adapter_factory=adapter_factory).run_task(
                 task.task_id, task.input
@@ -91,7 +101,7 @@ def build_schedules_router(
             interval_minutes=dto.interval_minutes,
             timezone=dto.timezone,
             callback=_run_scheduled_task,
-            kwargs={"task_input": dto.task_input},
+            kwargs={"task_input": dto.task_input, "schedule_id": dto.id, "schedule_name": dto.name},
         )
         updated = service.set_next_run_at(dto.id, next_run_at)
         return ScheduleResponse(**(updated.__dict__ if updated else dto.model_dump()))
@@ -178,6 +188,16 @@ def build_schedules_router(
 
         task_service = TaskService(db)
         task = task_service.create_task(schedule.task_input)
+        task_service.save_artifact(
+            task.task_id,
+            "trigger_meta",
+            {
+                "source": "schedule_run_once",
+                "schedule_id": schedule.id,
+                "schedule_name": schedule.name,
+                "triggered_at_utc": datetime.now(UTC).isoformat(),
+            },
+        )
         runner = ValueCellRunner(runner_config)
         executor = ExecutionService(task_service=task_service, runner=runner, adapter_factory=adapter_factory)
         try:

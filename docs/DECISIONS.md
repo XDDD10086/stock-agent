@@ -589,3 +589,30 @@
   - `trigger_type=interval` with `interval_minutes`
 - APScheduler integration now builds `IntervalTrigger` for interval schedules.
 - SQLite compat migration auto-adds `schedules.interval_minutes` for legacy DBs.
+
+## D-026 Discord Dual-Channel Routing and Unified Analyst Result Sink
+
+- Date: 2026-04-23
+- Status: Accepted
+
+### Decision
+
+- Introduce an external Discord bridge process (separate from FastAPI runtime).
+- Enforce channel-specific command routing:
+  - analyst channel(s): `/run`
+  - scheduler channel(s): `/schedule create|list|cancel|pause|resume|run-once`
+- Route all analysis outputs to `DISCORD_RESULT_CHANNEL_ID` (analyst sink), including scheduled executions.
+- Persist and use `trigger_meta` artifacts to identify scheduler-originated task runs.
+- Persist delivered task IDs to `DISCORD_DELIVERY_STATE_PATH` to prevent duplicate scheduled-result posts.
+
+### Rationale
+
+- Separating command entry by channel reduces operator mistakes and keeps scheduler operations isolated.
+- A unified analyst sink keeps decision output in one place for team visibility.
+- Dedupe state is required because polling is used to detect scheduled completions.
+
+### Consequences
+
+- New Discord bridge environment keys are required in `.env`/`.env.example`.
+- Scheduler execution paths now write `trigger_meta` artifact for downstream routing.
+- Dedupe state file is intentionally git-ignored (`data/discord_bridge_state.json`).

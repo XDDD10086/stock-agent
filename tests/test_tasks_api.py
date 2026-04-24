@@ -259,6 +259,30 @@ def test_run_endpoint_returns_409_when_runner_busy():
     assert response.json()["detail"] == "runner is busy"
 
 
+def test_run_endpoint_works_in_mock_pass_mode_without_browser_adapter(monkeypatch):
+    monkeypatch.setenv("VALUECELL_MOCK_MODE", "pass")
+    db_url = f"sqlite:///./data/test_tasks_mock_{uuid4().hex}.db"
+    app = create_app(db_url=db_url, adapter_factory=None)
+    client = TestClient(app)
+    created = client.post("/tasks", json={"input": "mock mode run"}).json()
+
+    run_response = client.post(f"/tasks/{created['task_id']}/run")
+    assert run_response.status_code == 200
+    payload = run_response.json()
+    assert payload["status"] == "completed"
+    assert payload["risk_rating"] == "yellow"
+    assert payload["valuecell_raw_response"]
+    assert "Mock mode is enabled" in payload["valuecell_raw_response"]
+    assert payload["prompt_chain_status"] in {"direct_pass", "revised_once"}
+
+    diagnostics = client.get(f"/tasks/{created['task_id']}/artifacts/runner_diagnostics")
+    assert diagnostics.status_code == 200
+    diag_payload = diagnostics.json()["payload"]
+    assert diag_payload["status"] == "completed"
+    assert diag_payload["step_history"]
+    assert diag_payload["step_history"][0]["step"] == "mock_pass_generate_result"
+
+
 def test_prompt_gate_revises_once_when_review_not_approved(monkeypatch):
     monkeypatch.setattr(
         "app.orchestrator.execution_service.build_llm_clients_from_env",

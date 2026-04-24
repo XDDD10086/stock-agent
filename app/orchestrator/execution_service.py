@@ -514,6 +514,7 @@ def build_runner_config_from_env() -> RunnerConfig:
         screenshots_dir=os.getenv("SCREENSHOTS_DIR", "./screenshots"),
         artifacts_dir=os.getenv("ARTIFACTS_DIR", "./artifacts"),
         poll_interval_seconds=int(os.getenv("VALUECELL_POLL_INTERVAL_SECONDS", "5")),
+        mock_mode=os.getenv("VALUECELL_MOCK_MODE", "off").strip().lower() or "off",
     )
 
 

@@ -6,8 +6,10 @@ screenshots/
 artifacts/
 logs/
 data/
+data/discord_bridge_state.json
 sessions/
 __pycache__/
 .pytest_cache/
 *.pyc
 .DS_Store
+.run/

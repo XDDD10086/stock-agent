@@ -553,3 +553,111 @@
 - Result: all PASS checkpoints including committee artifact presence
 - Command: `.venv/bin/python -m pytest -q`
 - Result: `49 passed`
+
+---
+
+## M8 - Discord Dual-Channel Control Console
+
+- Start: 2026-04-23
+- End: 2026-04-23
+- Status: Completed
+
+### Goals
+
+- Add a Discord bridge process that controls stock-agent through slash commands.
+- Split command entry by channel:
+  - analyst channel for `/run`
+  - scheduler channel for `/schedule *`
+- Unify all analysis outputs (manual + scheduled) to analyst result channel.
+- Add scheduled-result dedupe state persistence outside Git tracking.
+
+### Completed Work
+
+- Added new bridge package under `app/discord_bridge`:
+  - environment config loader
+  - channel/role authorization policy
+  - schedule target resolver (`id` first, unique name fallback)
+  - API client wrapper for `/tasks` and `/schedules`
+  - result formatter (embed/text)
+  - service layer for command flows + schedule-result polling
+  - persistent dedupe store (`DISCORD_DELIVERY_STATE_PATH`)
+- Added Discord runtime entrypoint and launch script:
+  - `app/discord_bridge/main.py`
+  - `app/discord_bridge/runtime.py`
+  - `scripts/run_discord_bridge.sh`
+- Added schedule trigger metadata persistence for watcher routing:
+  - scheduler callback now writes `trigger_meta` artifact (`source=schedule`)
+  - `run-once` path writes `trigger_meta` (`source=schedule_run_once`)
+- Added configuration/documentation updates:
+  - `.env.example` Discord keys + watcher defaults
+  - `README.md` and `RUNBOOK.md` Discord bridge usage notes
+  - `.gitignore` explicit ignore for `data/discord_bridge_state.json`
+  - optional dependency update for `discord.py`
+- UX/stability polish after live Discord trial:
+  - `/schedule create` handler now defers immediately and responds via follow-up to prevent "application did not respond"
+  - run command pre-checks active running tasks and short-circuits with 409 busy message before creating orphan tasks
+  - Streamlit `Schedule Desk` create flow simplified to three fields (`name`, `task description`, natural-language `trigger`) with shared parser logic
+  - Discord bot switched to mention-only prefix mode to remove misleading privileged message-content warning for slash-command-only usage
+
+### Verification Evidence
+
+- Command: `.venv/bin/python -m pytest -q tests/test_discord_bridge_policy.py tests/test_discord_bridge_formatter.py tests/test_discord_bridge_service.py tests/test_discord_bridge_integration.py tests/test_schedules_api.py tests/test_tasks_api.py`
+- Result: `26 passed`
+- Command: `.venv/bin/python -m pytest -q tests`
+- Result: `59 passed`
+- Command: `.venv/bin/python -m pytest -q tests`
+- Result: `73 passed`
+
+### Notes
+
+- ValueCell token-exhausted environments can still validate Discord flow using existing fake-adapter test path.
+- Real Discord runtime requires optional dependency install including `discord.py`.
+
+---
+
+## M9 - Documentation, Deployment Guide, and Release Hygiene
+
+- Start: 2026-04-23
+- End: 2026-04-23
+- Status: Completed
+
+### Goals
+
+- Deliver a complete project README that explains architecture, stack, features, and operations.
+- Add dedicated documentation for deployment/operations and frontend-backend responsibilities.
+- Run final regression tests and pre-push sensitive-information checks before GitHub submission.
+
+### Completed Work
+
+- Reworked `README.md` into a full operator/developer guide:
+  - architecture overview
+  - tech stack and feature matrix
+  - startup modes and run scripts
+  - Discord channel/permission model
+  - testing and troubleshooting
+  - security hygiene guidance
+- Added dedicated deployment guide:
+  - `docs/DEPLOYMENT.md`
+  - install/start/stop/validation/backup/security checklist
+- Added dedicated frontend-backend integration guide:
+  - `docs/FRONTEND_BACKEND.md`
+  - route/orchestrator/provider boundaries
+  - Streamlit + Discord bridge interaction model
+  - extension points and risk areas
+- Updated `ARCHITECTURE.md` with deeper component boundaries, runtime flows, guardrails, and artifact model.
+- Hardened flaky Discord watcher test data in `tests/test_discord_bridge_service.py` to use time-relative timestamps.
+
+### Verification Evidence
+
+- Command: `. .venv/bin/activate && python -m pytest -q tests`
+- Result: `92 passed`
+- Command: `rg -n "(OPENAI_API_KEY\\s*=\\s*sk-|GEMINI_API_KEY\\s*=\\s*AIza|DISCORD_BOT_TOKEN\\s*=\\s*[A-Za-z0-9_\\-]{20,}|xox[baprs]-|ghp_[A-Za-z0-9]{20,}|AIza[0-9A-Za-z_\\-]{20,})" --glob '!.venv/**' --glob '!data/**' --glob '!logs/**'`
+- Result: `no matches`
+
+### Notes
+
+- README and docs now document the default Discord watcher knobs:
+  - `DISCORD_TASK_WATCH_INTERVAL_SECONDS=5`
+  - `DISCORD_TASK_WATCH_LOOKBACK_MINUTES=180`
+  - `DISCORD_DELIVERY_STATE_PATH=./data/discord_bridge_state.json`
+  - `DISCORD_HTTP_TIMEOUT_SECONDS=30`

@@ -226,12 +226,19 @@ def test_run_once_endpoint_executes_and_returns_final_result():
     assert run_once.status_code == 200
     payload = run_once.json()
     assert payload["status"] == "completed"
+    assert payload["task_id"]
     assert payload["valuecell_raw_response"]
     assert payload["prompt_chain_status"] in {"direct_pass", "revised_once"}
     assert payload["committee_status"] in {"completed", "fallback"}
     if payload["committee_status"] == "completed":
         assert payload["committee_report_json"] is not None
         assert payload["committee_report_markdown"] is not None
+
+    trigger_meta = client.get(f"/tasks/{payload['task_id']}/artifacts/trigger_meta")
+    assert trigger_meta.status_code == 200
+    trigger_payload = trigger_meta.json()["payload"]
+    assert trigger_payload["source"] == "schedule_run_once"
+    assert trigger_payload["schedule_id"] == schedule_id
 
 
 def test_once_schedule_rejects_past_local_time():

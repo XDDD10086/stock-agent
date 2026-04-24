@@ -8,6 +8,7 @@ from app.orchestrator.execution_service import (
     DeterministicReviewerClient,
 )
 from app.orchestrator.execution_service import build_committee_clients_from_env
+from app.orchestrator.execution_service import build_runner_config_from_env
 
 
 def test_build_llm_clients_defaults_to_deterministic(monkeypatch):
@@ -28,3 +29,11 @@ def test_build_committee_clients_defaults_to_deterministic(monkeypatch):
     assert isinstance(drafter, DeterministicCommitteeDrafterClient)
     assert isinstance(reviewer, DeterministicCommitteeReviewerClient)
     assert isinstance(finalizer, DeterministicCommitteeFinalizerClient)
+
+
+def test_build_runner_config_reads_mock_mode(monkeypatch):
+    monkeypatch.setenv("VALUECELL_MOCK_MODE", "pass")
+
+    cfg = build_runner_config_from_env()
+
+    assert cfg.mock_mode == "pass"
